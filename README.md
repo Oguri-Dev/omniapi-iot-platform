@@ -1,6 +1,15 @@
 # OmniAPI 🚀
 
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go)](https://golang.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](Dockerfile)
+[![MongoDB](https://img.shields.io/badge/MongoDB-7.0+-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
+[![WebSocket](https://img.shields.io/badge/WebSocket-Enabled-FF6B6B?style=for-the-badge)](websocket/)
+[![MQTT](https://img.shields.io/badge/MQTT-Supported-660066?style=for-the-badge)](internal/connectors/adapters/mqttfeed/)
+
 Un sistema IoT avanzado desarrollado en Go con arquitectura de conectores, validación de esquemas, WebSockets y API REST completa para integración multi-tenant de datos agrícolas y acuícolas.
+
+> 🌟 **Proyecto destacado**: Plataforma completa para IoT agrícola con framework de conectores extensible, validación automática de esquemas y arquitectura multi-tenant.
 
 ## 🎯 Características Principales
 
@@ -28,6 +37,43 @@ Un sistema IoT avanzado desarrollado en Go con arquitectura de conectores, valid
 - ✅ Gestión de secretos con variables de entorno
 - ✅ Hot-reload de configuración
 - ✅ Docker ready y production ready
+
+## 🚀 Quick Start
+
+### Opción 1: Desarrollo Local
+```bash
+# Clonar repositorio
+git clone https://github.com/TM-Opera-O/omniapi-iot-platform.git
+cd omniapi-iot-platform
+
+# Setup automático (Windows)
+.\setup.bat
+
+# Setup automático (Linux/Mac)
+./setup.sh
+
+# O manual:
+cp .env.example .env  # Editar con tus valores
+go mod tidy
+go run main.go
+```
+
+### Opción 2: Docker (Recomendado)
+```bash
+# Stack completo con MongoDB + MQTT
+docker-compose up -d
+
+# Solo la aplicación
+docker build -t omniapi .
+docker run -p 3000:3000 --env-file .env omniapi
+```
+
+### 🌐 URLs después del setup
+- **🏠 Aplicación**: http://localhost:3000
+- **🏥 Health Check**: http://localhost:3000/api/health  
+- **📊 API Info**: http://localhost:3000/api/info
+- **🔗 WebSocket**: ws://localhost:3000/ws
+- **🧪 WS Test**: http://localhost:3000/ws/test
 
 ## 🛠️ Requisitos Previos
 

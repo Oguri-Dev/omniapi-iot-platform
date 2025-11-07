@@ -1,0 +1,123 @@
+# Mapping estándar para datos biométricos
+# Convierte mediciones biométricas a formato canónico
+
+name: 'biometric-standard'
+description: 'Mapeo estándar para datos biométricos desde sensores y mediciones manuales'
+capability: 'biometric.read'
+version: '1.0.0'
+strict_mode: true
+ignore_extra: false
+
+rules:
+  # Peso del pez/muestra
+  - source_field: 'weight'
+    target_field: 'weight'
+    required: true
+    description: 'Peso en kilogramos'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'kg'
+        to: 'kg'
+        min: 0
+        max: 10
+
+  # Longitud del pez/muestra
+  - source_field: 'length'
+    target_field: 'length'
+    required: true
+    description: 'Longitud en centímetros'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'cm'
+        to: 'cm'
+        min: 0
+        max: 100
+
+  # Puntuación de salud
+  - source_field: 'health_score'
+    target_field: 'health_score'
+    required: true
+    description: 'Puntuación de salud (0-100)'
+    transform:
+      type: 'scale'
+      parameters:
+        min: 0
+        max: 100
+
+  # Timestamp de la medición
+  - source_field: 'timestamp'
+    target_field: 'timestamp'
+    required: true
+    description: 'Timestamp de la medición'
+    transform:
+      type: 'timestamp'
+      parameters:
+        input_format: 'RFC3339'
+        output_format: 'RFC3339'
+
+  # ID de la jaula
+  - source_field: 'cage_id'
+    target_field: 'cage_id'
+    required: true
+    description: 'Identificador de la jaula'
+
+  # Número de muestras
+  - source_field: 'sample_count'
+    target_field: 'sample_count'
+    required: false
+    default_value: 1
+    description: 'Número de muestras tomadas'
+    transform:
+      type: 'scale'
+      parameters:
+        min: 1
+        max: 100
+
+  # Edad estimada (calculada desde peso y longitud)
+  - target_field: 'estimated_age_days'
+    required: false
+    description: 'Edad estimada en días basada en peso y longitud'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: '(weight * 100 + length * 2) / 3'
+
+  # Categoría de salud (calculada desde health_score)
+  - target_field: 'health_category'
+    required: false
+    description: 'Categoría de salud basada en el score'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: |
+          if health_score >= 90 then "excellent"
+          else if health_score >= 75 then "good"  
+          else if health_score >= 60 then "fair"
+          else "poor"
+
+  # Índice de condición corporal (K-factor)
+  - target_field: 'condition_factor'
+    required: false
+    description: 'Índice de condición corporal (K = 100 * weight / length³)'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: '100 * weight / (length * length * length / 1000000)'
+
+  # Método de medición
+  - source_field: 'measurement_method'
+    target_field: 'measurement_method'
+    required: false
+    default_value: 'manual'
+    description: 'Método utilizado para la medición'
+    transform:
+      type: 'enum'
+      parameters:
+        mapping:
+          'manual': 'manual'
+          'automatic': 'automatic'
+          'camera': 'automatic'
+          'sensor': 'automatic'
+          'scale': 'automatic'

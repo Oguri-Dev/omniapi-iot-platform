@@ -1,0 +1,52 @@
+# Mapping para datos MQTT de alimentación
+# Convierte mensajes MQTT del sistema de alimentación a formato canónico
+
+name: 'feeding-mqtt'
+description: 'Mapeo para datos de alimentación recibidos via MQTT'
+capability: 'feeding.read'
+version: '1.0.0'
+strict_mode: false
+ignore_extra: true
+
+rules:
+  # Cantidad desde payload MQTT
+  - source_field: 'payload.amount_kg'
+    target_field: 'feed_amount'
+    required: true
+    description: 'Cantidad de alimento desde MQTT payload'
+
+  # Tipo desde topic parsing
+  - source_field: 'topic.feed_type'
+    target_field: 'feed_type'
+    required: true
+    description: 'Tipo de alimento extraído del topic MQTT'
+    transform:
+      type: 'enum'
+      parameters:
+        mapping:
+          'dry': 'pellets'
+          'wet': 'liquid'
+          'supplement': 'mixed'
+
+  # Timestamp desde mensaje MQTT
+  - source_field: 'mqtt_timestamp'
+    target_field: 'timestamp'
+    required: true
+    description: 'Timestamp del mensaje MQTT'
+    transform:
+      type: 'timestamp'
+      parameters:
+        input_format: 'unix'
+        output_format: 'RFC3339'
+
+  # Cage ID desde topic
+  - source_field: 'topic.cage_id'
+    target_field: 'cage_id'
+    required: true
+    description: 'ID de jaula extraído del topic MQTT'
+
+  # Siempre automático para MQTT
+  - target_field: 'automatic'
+    required: false
+    default_value: true
+    description: 'Alimentación MQTT siempre es automática'

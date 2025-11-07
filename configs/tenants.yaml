@@ -1,0 +1,140 @@
+# Configuración de tenants del sistema OmniAPI
+# Define los tenants (organizaciones) que pueden usar el sistema
+
+tenants:
+  # Tenant de demostración
+  - id: '655f1c2e8c4b2a1234567890'
+    name: 'demo-tenant'
+    display_name: 'Demo Tenant'
+    status: 'active'
+    created_by: 'system'
+
+    quotas:
+      - resource: 'api_calls_per_hour'
+        limit: 2000
+      - resource: 'storage_gb'
+        limit: 20
+      - resource: 'connections'
+        limit: 10
+      - resource: 'streams'
+        limit: 100
+      - resource: 'events_per_day'
+        limit: 50000
+
+    scopes:
+      - resource: '*'
+        permissions:
+          - 'feeding.read'
+          - 'biometric.read'
+          - 'climate.read'
+          - 'ops.read'
+        farm_ids:
+          - 'demo-farm-001'
+          - 'demo-farm-002'
+        site_ids:
+          - 'greenhouse-1'
+          - 'greenhouse-2'
+          - 'pond-1'
+        cage_ids:
+          - 'cage-A1'
+          - 'cage-A2'
+          - 'cage-B1'
+
+    settings:
+      timezone: 'UTC'
+      language: 'en'
+      notifications:
+        email: true
+        webhook: false
+      features:
+        advanced_analytics: true
+        real_time_alerts: true
+
+  # Tenant para testing
+  - id: '655f1c2e8c4b2a1234567891'
+    name: 'test-tenant'
+    display_name: 'Test Environment'
+    status: 'active'
+    created_by: 'system'
+
+    quotas:
+      - resource: 'api_calls_per_hour'
+        limit: 500
+      - resource: 'storage_gb'
+        limit: 5
+      - resource: 'connections'
+        limit: 3
+      - resource: 'streams'
+        limit: 25
+      - resource: 'events_per_day'
+        limit: 5000
+
+    scopes:
+      - resource: 'farm:test-farm-001'
+        permissions:
+          - 'feeding.read'
+          - 'climate.read'
+        farm_ids:
+          - 'test-farm-001'
+        site_ids:
+          - 'test-site-001'
+
+    settings:
+      timezone: 'UTC'
+      language: 'en'
+      notifications:
+        email: false
+        webhook: true
+      features:
+        advanced_analytics: false
+        real_time_alerts: true
+
+  # Tenant de producción (ejemplo)
+  - id: '655f1c2e8c4b2a1234567892'
+    name: 'acme-aquaculture'
+    display_name: 'ACME Aquaculture Inc.'
+    status: 'active'
+    created_by: 'admin'
+
+    quotas:
+      - resource: 'api_calls_per_hour'
+        limit: 10000
+      - resource: 'storage_gb'
+        limit: 100
+      - resource: 'connections'
+        limit: 50
+      - resource: 'streams'
+        limit: 500
+      - resource: 'events_per_day'
+        limit: 1000000
+
+    scopes:
+      - resource: '*'
+        permissions:
+          - 'feeding.read'
+          - 'biometric.read'
+          - 'climate.read'
+          - 'ops.read'
+        farm_ids:
+          - 'farm-north-001'
+          - 'farm-south-001'
+          - 'farm-west-001'
+        site_ids:
+          - 'pond-A'
+          - 'pond-B'
+          - 'pond-C'
+          - 'hatchery-1'
+          - 'processing-1'
+
+    settings:
+      timezone: 'America/New_York'
+      language: 'en'
+      notifications:
+        email: true
+        webhook: true
+        slack: true
+      features:
+        advanced_analytics: true
+        real_time_alerts: true
+        custom_dashboards: true
+        api_access: true

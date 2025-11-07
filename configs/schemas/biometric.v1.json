@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omniapi.com/schemas/biometric/v1.0.0",
+  "title": "Biometric Data Schema",
+  "description": "Schema for biometric sensor data from aquaculture organisms",
+  "type": "object",
+  "metadata": {
+    "version": "1.0.0",
+    "capability": "biometric.read",
+    "backward_compatible": true,
+    "compatibility_notes": "Initial version - no breaking changes",
+    "created_at": "2025-11-07T00:00:00Z",
+    "updated_at": "2025-11-07T00:00:00Z"
+  },
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the measurement"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Unique identifier of the biometric sensor",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "organism_id": {
+      "type": "string",
+      "description": "Unique identifier of the organism (fish, shrimp, etc.)",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "species": {
+      "type": "string",
+      "description": "Species of the organism",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "weight": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Weight of the organism in grams"
+    },
+    "length": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Length of the organism in centimeters"
+    },
+    "heart_rate": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Heart rate in beats per minute"
+    },
+    "activity_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Activity level of the organism"
+    },
+    "stress_indicators": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["cortisol_elevated", "erratic_movement", "color_change", "breathing_irregular", "feeding_reduced"]
+      },
+      "description": "Array of detected stress indicators"
+    },
+    "health_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Overall health score as percentage"
+    },
+    "body_condition": {
+      "type": "string",
+      "enum": ["poor", "fair", "good", "excellent"],
+      "description": "Visual body condition assessment"
+    },
+    "age_estimate": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Estimated age in days"
+    },
+    "growth_rate": {
+      "type": "number",
+      "description": "Growth rate in grams per day"
+    },
+    "mortality_risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Assessed mortality risk level"
+    },
+    "cage_id": {
+      "type": "string",
+      "description": "Identifier of the cage where organism is located",
+      "minLength": 1,
+      "maxLength": 50
+    },
+    "measurement_method": {
+      "type": "string",
+      "enum": ["manual", "camera", "sensor", "ultrasonic"],
+      "description": "Method used for biometric measurement"
+    }
+  },
+  "required": ["timestamp", "device_id", "organism_id", "species", "weight"],
+  "additionalProperties": false
+}

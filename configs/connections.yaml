@@ -1,0 +1,273 @@
+# Configuración de conexiones del sistema OmniAPI
+# Define las instancias de conexión que integran diferentes fuentes de datos
+
+connections:
+  # Conexión dummy para demostración
+  - id: '655f1c2e8c4b2a1234567800'
+    tenant_id: '655f1c2e8c4b2a1234567890'
+    type_id: 'dummy-connector-type'
+    display_name: 'Demo Dummy Connector'
+    description: 'Conector de demostración que genera datos sintéticos'
+    status: 'active'
+    created_by: 'system'
+
+    secrets_ref:
+      provider: 'env'
+      key: 'DEMO_CONNECTOR_SECRET'
+
+    config:
+      farm_id: 'demo-farm-001'
+      site_id: 'greenhouse-1'
+      cage_id: 'cage-A1'
+      interval_seconds: 1
+      data_variation: 0.1
+      enable_synthetic_errors: false
+
+    mappings:
+      - 'feeding-standard'
+      - 'biometric-standard'
+      - 'climate-standard'
+
+    tags:
+      - 'demo'
+      - 'synthetic'
+      - 'greenhouse'
+
+  # Conexión Modbus RTU (ejemplo)
+  - id: '655f1c2e8c4b2a1234567801'
+    tenant_id: '655f1c2e8c4b2a1234567892'
+    type_id: 'modbus-rtu-connector'
+    display_name: 'Pond A Climate Sensors'
+    description: 'Sensores climáticos del estanque A via Modbus RTU'
+    status: 'active'
+    created_by: 'admin'
+
+    secrets_ref:
+      provider: 'env'
+      key: 'MODBUS_RTU_SECRET'
+
+    config:
+      port: '/dev/ttyUSB0'
+      baudrate: 9600
+      parity: 'none'
+      stop_bits: 1
+      slave_id: 1
+      timeout: '5s'
+      poll_interval: '30s'
+
+      # Registro de sensores
+      registers:
+        temperature:
+          address: 40001
+          type: 'float32'
+          scale: 0.1
+        humidity:
+          address: 40003
+          type: 'uint16'
+          scale: 0.01
+        oxygen:
+          address: 40005
+          type: 'float32'
+          scale: 0.1
+        ph:
+          address: 40007
+          type: 'float32'
+          scale: 0.01
+
+    mappings:
+      - 'climate-modbus'
+
+    tags:
+      - 'production'
+      - 'modbus'
+      - 'pond-a'
+      - 'climate'
+
+  # Conexión MQTT (ejemplo)
+  - id: '655f1c2e8c4b2a1234567802'
+    tenant_id: '655f1c2e8c4b2a1234567892'
+    type_id: 'mqtt-connector'
+    display_name: 'Feeding System MQTT'
+    description: 'Sistema de alimentación automática via MQTT'
+    status: 'active'
+    created_by: 'admin'
+
+    secrets_ref:
+      provider: 'env'
+      key: 'MQTT_CREDENTIALS'
+
+    config:
+      broker_url: 'mqtt://mqtt.acme-aqua.com:1883'
+      client_id: 'omniapi-feeding-001'
+      keep_alive: 60
+      clean_session: true
+      qos: 1
+
+      # Topics de suscripción
+      topics:
+        - topic: 'farm/+/feeding/+/status'
+          capability: 'feeding.read'
+        - topic: 'farm/+/feeding/+/schedule'
+          capability: 'feeding.read'
+        - topic: 'farm/+/alerts/feeding'
+          capability: 'ops.read'
+
+      # Filtros de mensajes
+      filters:
+        farm_ids:
+          - 'farm-north-001'
+          - 'farm-south-001'
+
+    mappings:
+      - 'feeding-mqtt'
+      - 'ops-alerts'
+
+    tags:
+      - 'production'
+      - 'mqtt'
+      - 'feeding'
+      - 'automation'
+
+  # Conexión HTTP API (ejemplo)
+  - id: '655f1c2e8c4b2a1234567803'
+    tenant_id: '655f1c2e8c4b2a1234567890'
+    type_id: 'http-api-connector'
+    display_name: 'Biometric Data API'
+    description: 'API REST para datos biométricos de peces'
+    status: 'configuring'
+    created_by: 'user'
+
+    secrets_ref:
+      provider: 'env'
+      key: 'BIOMETRIC_API_TOKEN'
+
+    config:
+      base_url: 'https://api.biometrics.demo.com'
+      timeout: '30s'
+      retry_count: 3
+      retry_delay: '5s'
+
+      # Endpoints de datos
+      endpoints:
+        - path: '/v1/measurements/fish'
+          method: 'GET'
+          capability: 'biometric.read'
+          poll_interval: '300s' # 5 minutos
+
+        - path: '/v1/health/scores'
+          method: 'GET'
+          capability: 'biometric.read'
+          poll_interval: '600s' # 10 minutos
+
+      # Headers por defecto
+      headers:
+        Content-Type: 'application/json'
+        User-Agent: 'OmniAPI/1.0'
+
+      # Parámetros de query
+      default_params:
+        format: 'json'
+        version: 'v1'
+
+    mappings:
+      - 'biometric-api'
+
+    tags:
+      - 'demo'
+      - 'api'
+      - 'biometric'
+      - 'rest'
+
+  # Conexión en estado inactivo (ejemplo)
+  - id: '655f1c2e8c4b2a1234567804'
+    tenant_id: '655f1c2e8c4b2a1234567891'
+    type_id: 'dummy-connector-type'
+    display_name: 'Test Dummy (Inactive)'
+    description: 'Conector dummy para testing - actualmente inactivo'
+    status: 'inactive'
+    created_by: 'tester'
+
+    secrets_ref:
+      provider: 'env'
+      key: 'TEST_DUMMY_SECRET'
+
+    config:
+      farm_id: 'test-farm-001'
+      site_id: 'test-site-001'
+      interval_seconds: 5
+      data_variation: 0.2
+      enable_synthetic_errors: true
+      error_probability: 0.05 # 5% de probabilidad de error
+
+    mappings:
+      - 'feeding-test'
+      - 'climate-test'
+
+    tags:
+      - 'test'
+      - 'inactive'
+      - 'synthetic'
+
+  # Conexión MQTT Feed
+  - id: '655f1c2e8c4b2a1234567806'
+    tenant_id: '655f1c2e8c4b2a1234567890'
+    type_id: 'mqttfeed-connector-type'
+    display_name: 'Farm A MQTT Feeding System'
+    description: 'Sistema de alimentación automatizado vía MQTT'
+    status: 'active'
+    created_by: 'admin'
+
+    secrets_ref:
+      provider: 'env'
+      key: 'MQTT_FEED_SECRET'
+
+    config:
+      broker: 'tcp://localhost:1883'
+      client_id: 'omniapi-feedsystem-001'
+      username: 'feedsystem'
+      password: 'env://MQTT_FEED_PASSWORD'
+      qos: 1
+      keep_alive_seconds: 60
+      farm_id: 'farm-001'
+      site_id: 'pond-area-1'
+      cage_id: 'cage-001'
+
+    mappings:
+      - 'feeding-mqtt'
+
+    tags:
+      - 'mqtt'
+      - 'feeding'
+      - 'production'
+
+  # Conexión REST Climate
+  - id: '655f1c2e8c4b2a1234567807'
+    tenant_id: '655f1c2e8c4b2a1234567891'
+    type_id: 'restclimate-connector-type'
+    display_name: 'Weather Station API'
+    description: 'Estación meteorológica externa vía API REST'
+    status: 'active'
+    created_by: 'admin'
+
+    secrets_ref:
+      provider: 'env'
+      key: 'WEATHER_API_SECRET'
+
+    config:
+      endpoint: 'https://api.weather.gov/stations/FARM001/observations/latest'
+      poll_interval: '300s' # 5 minutos
+      timeout: '30s'
+      farm_id: 'farm-001'
+      site_id: 'outdoor'
+      headers:
+        Authorization: 'env://WEATHER_API_KEY'
+        User-Agent: 'OmniAPI-WeatherCollector/1.0'
+
+    mappings:
+      - 'climate-standard'
+
+    tags:
+      - 'rest'
+      - 'climate'
+      - 'external-api'
+      - 'production'

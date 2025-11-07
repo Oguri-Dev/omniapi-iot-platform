@@ -1,0 +1,170 @@
+# Mapping estándar para datos climáticos
+# Convierte lecturas de sensores ambientales a formato canónico
+
+name: 'climate-standard'
+description: 'Mapeo estándar para datos climáticos desde sensores ambientales'
+capability: 'climate.read'
+version: '1.0.0'
+strict_mode: false
+ignore_extra: true
+
+rules:
+  # Temperatura del agua/ambiente
+  - source_field: 'temperature'
+    target_field: 'temperature'
+    required: true
+    description: 'Temperatura en grados Celsius'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'celsius'
+        to: 'celsius'
+        min: -10
+        max: 50
+
+  # Humedad relativa
+  - source_field: 'humidity'
+    target_field: 'humidity'
+    required: false
+    description: 'Humedad relativa en porcentaje (0-100)'
+    transform:
+      type: 'scale'
+      parameters:
+        min: 0
+        max: 100
+        unit: 'percent'
+
+  # Nivel de oxígeno disuelto
+  - source_field: 'oxygen_level'
+    target_field: 'oxygen_level'
+    required: false
+    description: 'Oxígeno disuelto en mg/L'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'mg/L'
+        to: 'mg/L'
+        min: 0
+        max: 15
+
+  # Nivel de pH
+  - source_field: 'ph_level'
+    target_field: 'ph_level'
+    required: false
+    description: 'Nivel de pH (0-14)'
+    transform:
+      type: 'scale'
+      parameters:
+        min: 0
+        max: 14
+
+  # Timestamp de la lectura
+  - source_field: 'timestamp'
+    target_field: 'timestamp'
+    required: true
+    description: 'Timestamp de la lectura del sensor'
+    transform:
+      type: 'timestamp'
+      parameters:
+        input_format: 'RFC3339'
+        output_format: 'RFC3339'
+
+  # ID del sensor
+  - source_field: 'sensor_id'
+    target_field: 'sensor_id'
+    required: true
+    description: 'Identificador único del sensor'
+
+  # Presión atmosférica (opcional)
+  - source_field: 'pressure'
+    target_field: 'pressure'
+    required: false
+    description: 'Presión atmosférica en hPa'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'hPa'
+        to: 'hPa'
+        min: 800
+        max: 1200
+
+  # Turbidez del agua (opcional)
+  - source_field: 'turbidity'
+    target_field: 'turbidity'
+    required: false
+    description: 'Turbidez del agua en NTU'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'NTU'
+        to: 'NTU'
+        min: 0
+        max: 1000
+
+  # Salinidad (opcional)
+  - source_field: 'salinity'
+    target_field: 'salinity'
+    required: false
+    description: 'Salinidad en partes por mil (ppm)'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'ppm'
+        to: 'ppm'
+        min: 0
+        max: 50000
+
+  # Índice de calidad del agua (calculado)
+  - target_field: 'water_quality_index'
+    required: false
+    description: 'Índice de calidad del agua calculado'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: |
+          let temp_score = if temperature >= 18 && temperature <= 28 then 100 else 50
+          let oxygen_score = if oxygen_level >= 6 then 100 else oxygen_level * 16.67
+          let ph_score = if ph_level >= 6.5 && ph_level <= 8.5 then 100 else 50
+          return (temp_score + oxygen_score + ph_score) / 3
+
+  # Estado del sensor (calculado desde valores)
+  - target_field: 'sensor_status'
+    required: false
+    description: 'Estado inferido del sensor basado en lecturas'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: |
+          if temperature > -50 && temperature < 100 && 
+             oxygen_level >= 0 && oxygen_level <= 20 &&
+             ph_level >= 0 && ph_level <= 14
+          then "normal"
+          else "anomaly"
+
+  # Conversión de temperatura a Fahrenheit (adicional)
+  - source_field: 'temperature'
+    target_field: 'temperature_fahrenheit'
+    required: false
+    description: 'Temperatura en grados Fahrenheit'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'celsius'
+        to: 'fahrenheit'
+        formula: '(celsius * 9/5) + 32'
+
+  # Categorización de condiciones
+  - target_field: 'conditions'
+    required: false
+    description: 'Categorización de las condiciones ambientales'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: |
+          let conditions = []
+          if temperature < 15 then conditions.push("cold")
+          else if temperature > 30 then conditions.push("hot")
+          if oxygen_level < 5 then conditions.push("low_oxygen")
+          if ph_level < 6.5 || ph_level > 8.5 then conditions.push("ph_imbalance")
+          if humidity > 80 then conditions.push("high_humidity")
+          return conditions.join(",") || "normal"

@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://omniapi.com/schemas/feeding/v1.0.0",
+  "title": "Feeding Data Schema",
+  "description": "Schema for feeding-related IoT sensor data",
+  "type": "object",
+  "metadata": {
+    "version": "1.0.0",
+    "capability": "feeding.read",
+    "backward_compatible": true,
+    "compatibility_notes": "Initial version - no breaking changes",
+    "created_at": "2025-11-07T00:00:00Z",
+    "updated_at": "2025-11-07T00:00:00Z"
+  },
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the measurement"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Unique identifier of the feeding device",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "feed_type": {
+      "type": "string",
+      "enum": ["pellets", "liquid", "supplement", "medication"],
+      "description": "Type of feed being dispensed"
+    },
+    "quantity": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Amount of feed dispensed in grams"
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Feeding duration in seconds"
+    },
+    "feed_rate": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Feed rate in grams per second"
+    },
+    "hopper_level": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Remaining feed level in hopper as percentage"
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": -50,
+      "maximum": 100,
+      "description": "Feed temperature in Celsius"
+    },
+    "ph_level": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 14,
+      "description": "pH level of liquid feed (if applicable)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "completed", "error", "paused"],
+      "description": "Current feeding operation status"
+    },
+    "error_code": {
+      "type": "string",
+      "description": "Error code if status is 'error'"
+    },
+    "cage_id": {
+      "type": "string",
+      "description": "Identifier of the cage being fed",
+      "minLength": 1,
+      "maxLength": 50
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "Feed batch identifier for traceability",
+      "minLength": 1,
+      "maxLength": 100
+    }
+  },
+  "required": ["timestamp", "device_id", "feed_type", "quantity", "status"],
+  "additionalProperties": false
+}

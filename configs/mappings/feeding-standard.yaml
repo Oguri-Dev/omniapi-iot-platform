@@ -1,0 +1,93 @@
+# Mapping estándar para datos de alimentación
+# Convierte datos de alimentación a formato canónico
+
+name: 'feeding-standard'
+description: 'Mapeo estándar para datos de alimentación desde conectores dummy y sensores básicos'
+capability: 'feeding.read'
+version: '1.0.0'
+strict_mode: false
+ignore_extra: true
+
+rules:
+  # Cantidad de alimento
+  - source_field: 'feed_amount'
+    target_field: 'feed_amount'
+    required: true
+    description: 'Cantidad de alimento en kilogramos'
+    transform:
+      type: 'scale'
+      parameters:
+        min: 0
+        max: 100
+        unit: 'kg'
+
+  # Tipo de alimento
+  - source_field: 'feed_type'
+    target_field: 'feed_type'
+    required: true
+    description: 'Tipo de alimento utilizado'
+    transform:
+      type: 'enum'
+      parameters:
+        mapping:
+          'pellets': 'pellets'
+          'liquid': 'liquid'
+          'mixed': 'mixed'
+          'flakes': 'pellets' # Mapear flakes a pellets
+          'powder': 'liquid' # Mapear powder a liquid
+
+  # Timestamp del evento
+  - source_field: 'timestamp'
+    target_field: 'timestamp'
+    required: true
+    description: 'Timestamp del evento de alimentación'
+    transform:
+      type: 'timestamp'
+      parameters:
+        input_format: 'RFC3339'
+        output_format: 'RFC3339'
+
+  # ID de la jaula
+  - source_field: 'cage_id'
+    target_field: 'cage_id'
+    required: false
+    description: 'Identificador de la jaula'
+
+  # Alimentación automática
+  - source_field: 'automatic'
+    target_field: 'automatic'
+    required: false
+    default_value: false
+    description: 'Indica si la alimentación fue automática'
+
+  # Duración de la alimentación (opcional)
+  - source_field: 'duration'
+    target_field: 'duration_seconds'
+    required: false
+    description: 'Duración de la alimentación en segundos'
+    transform:
+      type: 'unit'
+      parameters:
+        from: 'minutes'
+        to: 'seconds'
+        multiplier: 60
+
+  # Personal responsable (calculado)
+  - target_field: 'fed_by'
+    required: false
+    default_value: 'system'
+    description: 'Personal responsable de la alimentación'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: "if(automatic, 'system', 'manual')"
+
+  # Validación de rango de cantidad
+  - source_field: 'feed_amount'
+    target_field: 'amount_validated'
+    required: false
+    description: 'Validación de rango de cantidad'
+    transform:
+      type: 'calculated'
+      parameters:
+        formula: 'feed_amount >= 0 && feed_amount <= 50'

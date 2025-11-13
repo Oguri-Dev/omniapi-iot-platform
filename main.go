@@ -17,6 +17,7 @@ import (
 	"omniapi/internal/queue/requester"
 	"omniapi/internal/queue/status"
 	"omniapi/internal/router"
+	"omniapi/services"
 	"omniapi/websocket"
 
 	"github.com/joho/godotenv"
@@ -34,7 +35,7 @@ func main() {
 	// Cargar configuración extendida
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("❌ Error loading configuration: %v", err)
+		log.Fatalf("❌ Error loading Configuration: %v", err)
 	}
 
 	// Registrar todos los adaptadores
@@ -61,6 +62,17 @@ func main() {
 
 	// Inicializar servicios de MongoDB
 	handlers.InitServices()
+
+	// Verificar si existe un usuario administrador
+	fmt.Println("\n🔐 Checking admin user...")
+	adminExists, err := services.CheckAdminExists()
+	if err != nil {
+		log.Printf("⚠️  Warning: Could not check admin user: %v", err)
+	} else if !adminExists {
+		fmt.Println("⚠️  No admin user found. Please complete setup via /api/auth/setup")
+	} else {
+		fmt.Println("✅ Admin user exists")
+	}
 
 	// Crear contexto global con cancelación
 	ctx, cancel := context.WithCancel(context.Background())
@@ -268,6 +280,42 @@ func main() {
 	http.HandleFunc("/api/health", handlers.HealthHandler)
 	http.HandleFunc("/api/info", handlers.InfoHandler)
 	http.HandleFunc("/api/time", handlers.TimeHandler)
+
+	// Configurar rutas de autenticación
+	http.HandleFunc("/api/auth/login", handlers.CORSMiddleware(handlers.LoginHandler))
+	http.HandleFunc("/api/auth/register", handlers.CORSMiddleware(handlers.RegisterHandler))
+	http.HandleFunc("/api/auth/setup/check", handlers.CORSMiddleware(handlers.CheckSetupHandler))
+	http.HandleFunc("/api/auth/setup", handlers.CORSMiddleware(handlers.SetupHandler))
+
+	// Configurar rutas de servicios externos
+	http.HandleFunc("/api/services", handlers.CORSMiddleware(handlers.GetServicesHandler))
+	http.HandleFunc("/api/services/get", handlers.CORSMiddleware(handlers.GetServiceHandler))
+	http.HandleFunc("/api/services/create", handlers.CORSMiddleware(handlers.CreateServiceHandler))
+	http.HandleFunc("/api/services/update", handlers.CORSMiddleware(handlers.UpdateServiceHandler))
+	http.HandleFunc("/api/services/delete", handlers.CORSMiddleware(handlers.DeleteServiceHandler))
+	http.HandleFunc("/api/services/test", handlers.CORSMiddleware(handlers.TestServiceConnectionHandler))
+
+	// Configurar rutas de tenants (empresas salmoneras)
+	http.HandleFunc("/api/tenants", handlers.CORSMiddleware(handlers.GetTenantsHandler))
+	http.HandleFunc("/api/tenants/get", handlers.CORSMiddleware(handlers.GetTenantHandler))
+	http.HandleFunc("/api/tenants/create", handlers.CORSMiddleware(handlers.CreateTenantHandler))
+	http.HandleFunc("/api/tenants/update", handlers.CORSMiddleware(handlers.UpdateTenantHandler))
+	http.HandleFunc("/api/tenants/delete", handlers.CORSMiddleware(handlers.DeleteTenantHandler))
+
+	// Configurar rutas de sites (centros de cultivo)
+	http.HandleFunc("/api/sites", handlers.CORSMiddleware(handlers.GetSitesHandler))
+	http.HandleFunc("/api/sites/get", handlers.CORSMiddleware(handlers.GetSiteHandler))
+	http.HandleFunc("/api/sites/create", handlers.CORSMiddleware(handlers.CreateSiteHandler))
+	http.HandleFunc("/api/sites/update", handlers.CORSMiddleware(handlers.UpdateSiteHandler))
+	http.HandleFunc("/api/sites/delete", handlers.CORSMiddleware(handlers.DeleteSiteHandler))
+
+	// Configurar rutas de external services (servicios externos)
+	http.HandleFunc("/api/external-services", handlers.CORSMiddleware(handlers.GetExternalServicesHandler))
+	http.HandleFunc("/api/external-services/get", handlers.CORSMiddleware(handlers.GetExternalServiceHandler))
+	http.HandleFunc("/api/external-services/create", handlers.CORSMiddleware(handlers.CreateExternalServiceHandler))
+	http.HandleFunc("/api/external-services/update", handlers.CORSMiddleware(handlers.UpdateExternalServiceHandler))
+	http.HandleFunc("/api/external-services/delete", handlers.CORSMiddleware(handlers.DeleteExternalServiceHandler))
+	http.HandleFunc("/api/external-services/test", handlers.CORSMiddleware(handlers.TestExternalServiceConnectionHandler))
 
 	// Configurar rutas de MongoDB API
 	http.HandleFunc("/api/users", handlers.GetUsersHandler)

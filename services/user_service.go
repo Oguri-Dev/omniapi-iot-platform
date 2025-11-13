@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserService servicio para operaciones de usuarios
@@ -231,4 +232,75 @@ func (us *UserService) SearchUsers(query string, page, perPage int) ([]models.Us
 	}
 
 	return us.List(page, perPage, filter)
+}
+
+// CheckAdminExists verifica si existe al menos un usuario administrador
+// Retorna true si existe, false si no existe
+func CheckAdminExists() (bool, error) {
+	collection := database.GetCollection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Buscar si existe algún usuario admin
+	count, err := collection.CountDocuments(ctx, bson.M{"role": "admin", "status": "active"})
+	if err != nil {
+		return false, fmt.Errorf("error verificando usuarios admin: %v", err)
+	}
+
+	return count > 0, nil
+}
+
+// CreateFirstAdmin crea el primer usuario administrador del sistema
+// Solo funciona si no existe ningún admin en la base de datos
+func CreateFirstAdmin(username, email, password, fullName string) (*models.User, error) {
+	collection := database.GetCollection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Verificar que no exista ningún admin
+	count, err := collection.CountDocuments(ctx, bson.M{"role": "admin", "status": "active"})
+	if err != nil {
+		return nil, fmt.Errorf("error verificando usuarios admin: %v", err)
+	}
+
+	if count > 0 {
+		return nil, fmt.Errorf("ya existe un usuario administrador en el sistema")
+	}
+
+	// Hashear contraseña
+	hashedPassword, err := hashPassword(password)
+	if err != nil {
+		return nil, fmt.Errorf("error generando hash de contraseña: %v", err)
+	}
+
+	// Crear usuario admin
+	newAdmin := models.User{
+		ID:        primitive.NewObjectID(),
+		Username:  username,
+		Email:     email,
+		Password:  hashedPassword,
+		FullName:  fullName,
+		Status:    "active",
+		Role:      "admin",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	_, err = collection.InsertOne(ctx, newAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("error creando usuario admin: %v", err)
+	}
+
+	fmt.Printf("✅ First admin user created: %s (%s)\n", newAdmin.Username, newAdmin.Email)
+
+	return &newAdmin, nil
+}
+
+// hashPassword función auxiliar para hashear contraseñas
+func hashPassword(password string) (string, error) {
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedBytes), nil
 }

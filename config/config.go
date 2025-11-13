@@ -37,11 +37,13 @@ type MongoDBConfig struct {
 
 // AppConfig configuración de la aplicación
 type AppConfig struct {
-	HTTP      HTTPConfig     `yaml:"http"`
-	WebSocket WSConfig       `yaml:"websocket"`
-	Auth      AuthConfig     `yaml:"auth"`
-	Quotas    QuotasConfig   `yaml:"quotas"`
-	Policies  PoliciesConfig `yaml:"policies"`
+	HTTP      HTTPConfig      `yaml:"http"`
+	WebSocket WSConfig        `yaml:"websocket"`
+	Auth      AuthConfig      `yaml:"auth"`
+	Quotas    QuotasConfig    `yaml:"quotas"`
+	Policies  PoliciesConfig  `yaml:"policies"`
+	Requester RequesterConfig `yaml:"requester"`
+	Status    StatusConfig    `yaml:"status"`
 }
 
 // HTTPConfig configuración del servidor HTTP
@@ -108,6 +110,24 @@ type DataRetentionConfig struct {
 	Events  time.Duration `yaml:"events"`
 	Logs    time.Duration `yaml:"logs"`
 	Metrics time.Duration `yaml:"metrics"`
+}
+
+// RequesterConfig configuración del módulo requester
+type RequesterConfig struct {
+	TimeoutSeconds int                  `yaml:"timeout_seconds"`
+	BackoffSeconds []int                `yaml:"backoff_seconds"`
+	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
+}
+
+// CircuitBreakerConfig configuración del circuit breaker
+type CircuitBreakerConfig struct {
+	FailuresThreshold int `yaml:"failures_threshold"`
+	PauseMinutes      int `yaml:"pause_minutes"`
+}
+
+// StatusConfig configuración del módulo status
+type StatusConfig struct {
+	HeartbeatSeconds int `yaml:"heartbeat_seconds"`
 }
 
 // TenantConfig configuración de un tenant

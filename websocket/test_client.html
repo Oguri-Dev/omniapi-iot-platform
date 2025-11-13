@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniAPI WebSocket Test Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            height: calc(100vh - 40px);
+            overflow: hidden;
+        }
+        .sidebar {
+            padding: 20px;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+        }
+        .main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            grid-column: 1 / -1;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .status {
+            padding: 10px 20px;
+            background: #f8d7da;
+            color: #721c24;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #495057;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #6c757d;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .checkbox-group input {
+            margin-right: 8px;
+            width: auto;
+        }
+        button {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #218838;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        button.primary {
+            background: #007bff;
+        }
+        button.primary:hover {
+            background: #0056b3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        .events-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .event {
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+        .event.data {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+        }
+        .event.status {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .event.ack {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .event.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .event.warn {
+            background: #fff3cd;
+            border-left: 4px solid #ff6b6b;
+        }
+        .event-header {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .event-time {
+            font-size: 11px;
+            color: #6c757d;
+        }
+        .event-body {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .stats {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .stats-label {
+            color: #6c757d;
+        }
+        .stats-value {
+            font-weight: 600;
+            color: #495057;
+        }
+        .clear-btn {
+            background: #6c757d;
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 OmniAPI WebSocket Test Client</h1>
+            <p>Protocol: omniapi-ws-v1 | DATA + STATUS events</p>
+        </div>
+        
+        <div class="sidebar">
+            <div class="section">
+                <div class="section-title">Connection</div>
+                <label>Tenant ID (hex)</label>
+                <input type="text" id="tenantId" value="507f1f77bcf86cd799439011">
+                
+                <label>Client ID (optional)</label>
+                <input type="text" id="clientId" placeholder="Auto-generated">
+                
+                <button id="connectBtn" class="primary" onclick="toggleConnection()">Connect</button>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Subscription</div>
+                <label>Stream Kind</label>
+                <select id="streamKind">
+                    <option value="feeding">feeding</option>
+                    <option value="biometric">biometric</option>
+                    <option value="climate">climate</option>
+                    <option value="">All kinds</option>
+                </select>
+                
+                <label>Site ID</label>
+                <input type="text" id="streamSiteId" value="site-A">
+                
+                <label>Cage ID (optional)</label>
+                <input type="text" id="streamCageId" placeholder="Leave empty for all">
+                
+                <label>Metric (optional)</label>
+                <input type="text" id="streamMetric" placeholder="e.g., feeding.appetite">
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="includeStatus" checked>
+                    <label for="includeStatus">Include STATUS events</label>
+                </div>
+                
+                <label>Throttle (ms)</label>
+                <input type="number" id="throttleMs" value="100">
+                
+                <button onclick="subscribe()" disabled id="subBtn">Subscribe (SUB)</button>
+                <button onclick="unsubscribe()" disabled id="unsubBtn">Unsubscribe (UNSUB)</button>
+                <button onclick="sendPing()" disabled id="pingBtn">Send PING</button>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Statistics</div>
+                <div class="stats" id="stats">
+                    <div class="stats-row">
+                        <span class="stats-label">DATA events:</span>
+                        <span class="stats-value" id="dataCount">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">STATUS events:</span>
+                        <span class="stats-value" id="statusCount">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">ACK received:</span>
+                        <span class="stats-value" id="ackCount">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">Errors:</span>
+                        <span class="stats-value" id="errorCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main">
+            <div id="status" class="status">
+                ❌ Disconnected - Configure connection and click Connect
+            </div>
+            
+            <div style="padding: 10px 20px; background: white; border-bottom: 1px solid #dee2e6;">
+                <button class="clear-btn" onclick="clearEvents()">Clear Events</button>
+            </div>
+            
+            <div class="events-area" id="eventsArea">
+                <div class="event ack">
+                    <div class="event-header">
+                        <span>Welcome</span>
+                        <span class="event-time">Ready</span>
+                    </div>
+                    <div class="event-body">WebSocket test client ready. Connect to start receiving events.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let connected = false;
+        let stats = {
+            data: 0,
+            status: 0,
+            ack: 0,
+            error: 0
+        };
+
+        function toggleConnection() {
+            if (connected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        function connect() {
+            const tenantId = document.getElementById('tenantId').value.trim();
+            if (!tenantId) {
+                alert('Tenant ID is required');
+                return;
+            }
+
+            const clientId = document.getElementById('clientId').value.trim();
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let wsUrl = `${protocol}//${window.location.host}/ws?tenantId=${tenantId}`;
+            if (clientId) {
+                wsUrl += `&clientId=${clientId}`;
+            }
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                connected = true;
+                updateStatus('✅ Connected to WebSocket server', 'connected');
+                document.getElementById('connectBtn').textContent = 'Disconnect';
+                document.getElementById('connectBtn').className = 'danger';
+                document.getElementById('subBtn').disabled = false;
+                document.getElementById('pingBtn').disabled = false;
+                
+                addSystemEvent('Connected to WebSocket server', 'ack');
+            };
+            
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                handleMessage(message);
+            };
+            
+            ws.onclose = function(event) {
+                connected = false;
+                updateStatus('❌ Disconnected', '');
+                document.getElementById('connectBtn').textContent = 'Connect';
+                document.getElementById('connectBtn').className = 'primary';
+                document.getElementById('subBtn').disabled = true;
+                document.getElementById('unsubBtn').disabled = true;
+                document.getElementById('pingBtn').disabled = true;
+                
+                addSystemEvent('Disconnected from server', 'error');
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                addSystemEvent('WebSocket connection error', 'error');
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function subscribe() {
+            if (!connected) return;
+
+            const kind = document.getElementById('streamKind').value;
+            const siteId = document.getElementById('streamSiteId').value;
+            const cageId = document.getElementById('streamCageId').value;
+            const metric = document.getElementById('streamMetric').value;
+            const includeStatus = document.getElementById('includeStatus').checked;
+            const throttleMs = parseInt(document.getElementById('throttleMs').value) || 100;
+
+            const stream = {
+                kind: kind,
+                siteId: siteId
+            };
+            if (cageId) stream.cageId = cageId;
+            if (metric) stream.metric = metric;
+
+            const subMsg = {
+                type: 'SUB',
+                streams: [stream],
+                includeStatus: includeStatus,
+                throttleMs: throttleMs
+            };
+
+            ws.send(JSON.stringify(subMsg));
+            addSystemEvent('SUB message sent: ' + JSON.stringify(subMsg, null, 2), 'ack');
+            document.getElementById('unsubBtn').disabled = false;
+        }
+
+        function unsubscribe() {
+            if (!connected) return;
+
+            const unsubMsg = {
+                type: 'UNSUB'
+            };
+
+            ws.send(JSON.stringify(unsubMsg));
+            addSystemEvent('UNSUB message sent', 'ack');
+            document.getElementById('unsubBtn').disabled = true;
+        }
+
+        function sendPing() {
+            if (!connected) return;
+
+            ws.send(JSON.stringify({ type: 'PING' }));
+            addSystemEvent('PING sent', 'ack');
+        }
+
+        function handleMessage(message) {
+            switch(message.type) {
+                case 'ACK':
+                    stats.ack++;
+                    updateStats();
+                    addEvent('ACK', message, 'ack');
+                    break;
+                case 'ERROR':
+                    stats.error++;
+                    updateStats();
+                    addEvent('ERROR', message, 'error');
+                    break;
+                case 'WARN':
+                    addEvent('WARN', message, 'warn');
+                    break;
+                case 'PONG':
+                    addSystemEvent('PONG received', 'ack');
+                    break;
+                case 'DATA':
+                    stats.data++;
+                    updateStats();
+                    addEvent('DATA', message, 'data');
+                    break;
+                case 'STATUS':
+                    stats.status++;
+                    updateStats();
+                    addEvent('STATUS', message, 'status');
+                    break;
+                default:
+                    console.log('Unknown message type:', message);
+            }
+        }
+
+        function addEvent(title, message, className) {
+            const eventsArea = document.getElementById('eventsArea');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event ' + className;
+            
+            const time = new Date().toLocaleTimeString();
+            const body = JSON.stringify(message, null, 2);
+            
+            eventDiv.innerHTML = `
+                <div class="event-header">
+                    <span>${title}</span>
+                    <span class="event-time">${time}</span>
+                </div>
+                <div class="event-body">${body}</div>
+            `;
+            
+            eventsArea.appendChild(eventDiv);
+            eventsArea.scrollTop = eventsArea.scrollHeight;
+        }
+
+        function addSystemEvent(text, className) {
+            const eventsArea = document.getElementById('eventsArea');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event ' + className;
+            
+            const time = new Date().toLocaleTimeString();
+            
+            eventDiv.innerHTML = `
+                <div class="event-header">
+                    <span>System</span>
+                    <span class="event-time">${time}</span>
+                </div>
+                <div class="event-body">${text}</div>
+            `;
+            
+            eventsArea.appendChild(eventDiv);
+            eventsArea.scrollTop = eventsArea.scrollHeight;
+        }
+
+        function updateStatus(text, className) {
+            const status = document.getElementById('status');
+            status.textContent = text;
+            status.className = 'status ' + className;
+        }
+
+        function updateStats() {
+            document.getElementById('dataCount').textContent = stats.data;
+            document.getElementById('statusCount').textContent = stats.status;
+            document.getElementById('ackCount').textContent = stats.ack;
+            document.getElementById('errorCount').textContent = stats.error;
+        }
+
+        function clearEvents() {
+            document.getElementById('eventsArea').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

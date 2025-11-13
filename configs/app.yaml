@@ -68,3 +68,15 @@ policies:
     events: 720h # 30 días
     logs: 168h # 7 días
     metrics: 2160h # 90 días
+
+# Configuración del módulo Requester (queue de consultas)
+requester:
+  timeout_seconds: 30
+  backoff_seconds: [60, 120, 300] # 1min, 2min, 5min
+  circuit_breaker:
+    failures_threshold: 5
+    pause_minutes: 5
+
+# Configuración del módulo Status (heartbeats de estado)
+status:
+  heartbeat_seconds: 10 # Emitir heartbeat cada 10 segundos

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,9 +14,13 @@ import (
 	"omniapi/config"
 	"omniapi/database"
 	"omniapi/handlers"
+	"omniapi/internal/queue/requester"
+	"omniapi/internal/queue/status"
+	"omniapi/internal/router"
 	"omniapi/websocket"
 
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -54,22 +59,209 @@ func main() {
 	}
 	fmt.Println("✅ MongoDB connection established")
 
-	// Configurar cierre graceful de MongoDB
+	// Inicializar servicios de MongoDB
+	handlers.InitServices()
+
+	// Crear contexto global con cancelación
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// ═══════════════════════════════════════════════════════════
+	// FASE 1: Crear Router (núcleo del sistema)
+	// ═══════════════════════════════════════════════════════════
+	fmt.Println("\n📡 Initializing Router...")
+	r := router.NewRouter()
+
+	// Iniciar router
+	if err := r.Start(ctx); err != nil {
+		log.Fatalf("❌ Error starting router: %v", err)
+	}
+	fmt.Println("✅ Router started successfully")
+
+	// ═══════════════════════════════════════════════════════════
+	// FASE 2: Crear Requesters (uno por provider-site)
+	// ═══════════════════════════════════════════════════════════
+	fmt.Printf("\n🔄 Building Requesters from %d connections...\n", len(cfg.Connections))
+
+	requesters := make(map[string]requester.Requester) // Key: provider:tenantId:siteId
+	streamTracker := status.NewStreamTracker()
+
+	for _, connCfg := range cfg.Connections {
+		// Solo procesar conexiones activas
+		if connCfg.Status != "active" {
+			continue
+		}
+
+		// Obtener site_id del config
+		siteID, ok := connCfg.Config["site_id"].(string)
+		if !ok {
+			log.Printf("⚠️  Connection %s missing site_id in config, skipping", connCfg.ID)
+			continue
+		}
+
+		// Determinar estrategia según tipo de conector
+		var strategy requester.Strategy
+		switch connCfg.TypeID {
+		case "scaleaq-cloud":
+			// Obtener credenciales de config
+			apiKey, _ := connCfg.Config["api_key"].(string)
+			endpoint, _ := connCfg.Config["endpoint"].(string)
+			strategy = requester.NewScaleAQCloudStrategy(endpoint, apiKey)
+		case "process-api":
+			endpoint, _ := connCfg.Config["endpoint"].(string)
+			strategy = requester.NewProcessAPIStrategy(endpoint)
+		default:
+			// Usar NoOp para tipos no implementados o de prueba
+			strategy = requester.NewNoOpStrategy()
+		}
+
+		// Configurar requester desde app.yaml
+		reqConfig := requester.Config{
+			RequestTimeout:       time.Duration(cfg.App.Requester.TimeoutSeconds) * time.Second,
+			MaxConsecutiveErrors: cfg.App.Requester.CircuitBreaker.FailuresThreshold,
+			CircuitPauseDuration: time.Duration(cfg.App.Requester.CircuitBreaker.PauseMinutes) * time.Minute,
+			MaxQueueSize:         1000,
+			CoalescingEnabled:    true,
+		}
+
+		// Configurar backoff steps
+		if len(cfg.App.Requester.BackoffSeconds) >= 3 {
+			reqConfig.BackoffInitial = time.Duration(cfg.App.Requester.BackoffSeconds[0]) * time.Second
+			reqConfig.BackoffStep2 = time.Duration(cfg.App.Requester.BackoffSeconds[1]) * time.Second
+			reqConfig.BackoffStep3 = time.Duration(cfg.App.Requester.BackoffSeconds[2]) * time.Second
+		} else {
+			// Defaults
+			reqConfig.BackoffInitial = 60 * time.Second
+			reqConfig.BackoffStep2 = 120 * time.Second
+			reqConfig.BackoffStep3 = 300 * time.Second
+		}
+
+		// Crear requester
+		req := requester.NewSequentialRequester(reqConfig, strategy)
+
+		// Registrar callback para resultados → Router
+		req.OnResult(func(result requester.Result) {
+			r.OnRequesterResult(result)
+		})
+
+		// Iniciar requester
+		if err := req.Start(ctx); err != nil {
+			log.Printf("❌ Error starting requester for %s: %v", connCfg.ID, err)
+			continue
+		}
+
+		// Registrar streams en tracker (por cada métrica soportada)
+		// Asumimos que cada conector soporta ciertas métricas según su tipo
+		metrics := []string{"feeding", "biometric", "climate"} // Métricas genéricas
+		for _, metric := range metrics {
+			streamKey := status.StreamKey{
+				TenantID: connCfg.TenantID,
+				SiteID:   siteID,
+				CageID:   nil, // Puede ser más específico según el conector
+				Metric:   metric,
+				Source:   string(requester.SourceCloud),
+			}
+			streamTracker.RegisterStream(streamKey)
+		}
+
+		// Guardar referencia
+		key := fmt.Sprintf("%s:%s:%s", connCfg.TypeID, connCfg.TenantID, siteID)
+		requesters[key] = req
+
+		fmt.Printf("  ✓ Requester '%s' [%s] started (timeout=%ds, backoff=%v, cb_threshold=%d)\n",
+			connCfg.DisplayName,
+			connCfg.TypeID,
+			cfg.App.Requester.TimeoutSeconds,
+			cfg.App.Requester.BackoffSeconds,
+			cfg.App.Requester.CircuitBreaker.FailuresThreshold,
+		)
+	}
+
+	fmt.Printf("✅ %d Requesters initialized\n", len(requesters))
+
+	// ═══════════════════════════════════════════════════════════
+	// FASE 3: Crear StatusPusher
+	// ═══════════════════════════════════════════════════════════
+	fmt.Printf("\n💓 Initializing StatusPusher (heartbeat=%ds)...\n", cfg.App.Status.HeartbeatSeconds)
+
+	statusConfig := status.Config{
+		HeartbeatInterval:      time.Duration(cfg.App.Status.HeartbeatSeconds) * time.Second,
+		StaleThresholdOK:       30,  // 30 segundos
+		StaleThresholdDegraded: 120, // 2 minutos
+		MaxConsecutiveErrors:   5,
+	}
+
+	statusPusher := status.NewStatusPusher(statusConfig, streamTracker)
+
+	// Registrar callback para heartbeats → Router
+	statusPusher.OnEmit(func(st status.Status) {
+		r.OnStatusHeartbeat(st)
+	})
+
+	// Iniciar status pusher
+	if err := statusPusher.Start(ctx); err != nil {
+		log.Fatalf("❌ Error starting status pusher: %v", err)
+	}
+	fmt.Printf("✅ StatusPusher started (interval=%ds)\n", cfg.App.Status.HeartbeatSeconds)
+
+	// ═══════════════════════════════════════════════════════════
+	// FASE 4: Crear WebSocket Hub conectado al Router
+	// ═══════════════════════════════════════════════════════════
+	fmt.Println("\n🔌 Initializing WebSocket Hub...")
+	wsHub := websocket.NewHub(r)
+	go wsHub.Run()
+	fmt.Println("✅ WebSocket Hub started")
+
+	// ═══════════════════════════════════════════════════════════
+	// FASE 5: Iniciar actualización periódica de métricas
+	// ═══════════════════════════════════════════════════════════
+	fmt.Println("\n📊 Starting Prometheus metrics collector...")
+	go func() {
+		ticker := time.NewTicker(5 * time.Second) // Actualizar cada 5 segundos
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				// Actualizar métricas de requesters
+				for _, req := range requesters {
+					m := req.GetMetrics()
+					state := req.GetState()
+
+					// Las métricas se actualizarán automáticamente
+					// a través de los callbacks OnResult y los wrappers
+					_ = m
+					_ = state
+				}
+			}
+		}
+	}()
+	fmt.Println("✅ Prometheus metrics collector started")
+
+	// ═══════════════════════════════════════════════════════════
+	// Configurar cierre graceful
+	// ═══════════════════════════════════════════════════════════
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		fmt.Println("\n🔄 Cerrando conexión MongoDB...")
+		fmt.Println("\n� Shutting down server...")
+
+		// Cancelar contexto para detener todos los componentes
+		cancel()
+
+		// Esperar un poco para que se completen las operaciones
+		time.Sleep(1 * time.Second)
+
+		// Cerrar MongoDB
+		fmt.Println("🔄 Cerrando conexión MongoDB...")
 		database.Disconnect()
+
+		fmt.Println("✅ Server stopped gracefully")
 		os.Exit(0)
 	}()
-
-	// Inicializar servicios de MongoDB
-	handlers.InitServices()
-
-	// Crear y iniciar WebSocket Hub
-	wsHub := websocket.NewHub()
-	go wsHub.Run()
 
 	// Configurar rutas HTTP básicas
 	http.HandleFunc("/", handlers.HomeHandler)
@@ -104,6 +296,11 @@ func main() {
 	// Página de integración WebSocket
 	http.HandleFunc("/websocket", handlers.WSTestPageHandler)
 
+	// ═══════════════════════════════════════════════════════════
+	// Endpoint de Métricas Prometheus
+	// ═══════════════════════════════════════════════════════════
+	http.Handle("/metrics", promhttp.Handler())
+
 	// Información de inicio
 	fmt.Println("\n🚀 OmniAPI Server Started Successfully")
 	fmt.Printf("📍 Port: %s\n", cfg.Port)
@@ -131,6 +328,8 @@ func main() {
 	fmt.Printf("🧪 Test Client: http://localhost:%s/ws/test\n", cfg.Port)
 	fmt.Printf("📊 WS Stats: http://localhost:%s/ws/stats\n", cfg.Port)
 	fmt.Printf("📖 WS Integration: http://localhost:%s/websocket\n", cfg.Port)
+	fmt.Println("───────────── Monitoring Endpoints ────────────────")
+	fmt.Printf("📈 Prometheus Metrics: http://localhost:%s/metrics\n", cfg.Port)
 	fmt.Println("═══════════════════════════════════════════════════")
 
 	// Iniciar servidor

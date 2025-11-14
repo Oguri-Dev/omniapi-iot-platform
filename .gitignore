@@ -38,3 +38,10 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# Frontend (Node.js / React)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env.local
+frontend/.env.*.local

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"omniapi/crypto"
 	"omniapi/database"
 	"omniapi/models"
 	"omniapi/services"
@@ -15,7 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // ============================================================
@@ -268,48 +268,27 @@ func CreateExternalServiceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Encriptar credenciales sensibles
+	// Encriptar credenciales sensibles con AES (solo si están en texto plano)
 	if service.Credentials != nil {
-		if service.Credentials.Password != "" {
-			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(service.Credentials.Password), bcrypt.DefaultCost)
-			if err != nil {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   "Error encriptando password",
-				})
-				return
-			}
-			service.Credentials.Password = string(hashedPassword)
+		cryptoService, err := crypto.GetService()
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   fmt.Sprintf("Error inicializando servicio de encriptación: %v", err),
+			})
+			return
 		}
 
-		if service.Credentials.ClientSecret != "" {
-			hashedSecret, err := bcrypt.GenerateFromPassword([]byte(service.Credentials.ClientSecret), bcrypt.DefaultCost)
-			if err != nil {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   "Error encriptando client secret",
-				})
-				return
-			}
-			service.Credentials.ClientSecret = string(hashedSecret)
-		}
-
-		if service.Credentials.APIKey != "" {
-			hashedAPIKey, err := bcrypt.GenerateFromPassword([]byte(service.Credentials.APIKey), bcrypt.DefaultCost)
-			if err != nil {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   "Error encriptando API Key",
-				})
-				return
-			}
-			service.Credentials.APIKey = string(hashedAPIKey)
+		if err := encryptServiceCredentials(service.Credentials, cryptoService); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
 		}
 	}
 
@@ -389,19 +368,25 @@ func UpdateExternalServiceHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Encriptar credenciales si se proporcionan nuevas
 	if updates.Credentials != nil {
-		if updates.Credentials.Password != "" {
-			hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(updates.Credentials.Password), bcrypt.DefaultCost)
-			updates.Credentials.Password = string(hashedPassword)
+		cryptoService, err := crypto.GetService()
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   fmt.Sprintf("Error inicializando servicio de encriptación: %v", err),
+			})
+			return
 		}
 
-		if updates.Credentials.ClientSecret != "" {
-			hashedSecret, _ := bcrypt.GenerateFromPassword([]byte(updates.Credentials.ClientSecret), bcrypt.DefaultCost)
-			updates.Credentials.ClientSecret = string(hashedSecret)
-		}
-
-		if updates.Credentials.APIKey != "" {
-			hashedAPIKey, _ := bcrypt.GenerateFromPassword([]byte(updates.Credentials.APIKey), bcrypt.DefaultCost)
-			updates.Credentials.APIKey = string(hashedAPIKey)
+		if err := encryptServiceCredentials(updates.Credentials, cryptoService); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
 		}
 
 		// Invalidar token en cache si se cambian credenciales
@@ -628,4 +613,37 @@ func TestExternalServiceConnectionHandler(w http.ResponseWriter, r *http.Request
 			"token_length": len(tokenResp.AccessToken), // Solo mostrar longitud
 		},
 	})
+}
+
+// encryptServiceCredentials asegura que las credenciales sensibles se almacenen cifradas
+func encryptServiceCredentials(credentials *models.ServiceCredentials, cryptoService crypto.CryptoService) error {
+	if credentials == nil {
+		return nil
+	}
+
+	if credentials.Password != "" && !cryptoService.IsEncrypted(credentials.Password) {
+		encryptedPassword, err := cryptoService.Encrypt(credentials.Password)
+		if err != nil {
+			return fmt.Errorf("error encriptando password: %w", err)
+		}
+		credentials.Password = encryptedPassword
+	}
+
+	if credentials.ClientSecret != "" && !cryptoService.IsEncrypted(credentials.ClientSecret) {
+		encryptedSecret, err := cryptoService.Encrypt(credentials.ClientSecret)
+		if err != nil {
+			return fmt.Errorf("error encriptando client secret: %w", err)
+		}
+		credentials.ClientSecret = encryptedSecret
+	}
+
+	if credentials.APIKey != "" && !cryptoService.IsEncrypted(credentials.APIKey) {
+		encryptedAPIKey, err := cryptoService.Encrypt(credentials.APIKey)
+		if err != nil {
+			return fmt.Errorf("error encriptando API Key: %w", err)
+		}
+		credentials.APIKey = encryptedAPIKey
+	}
+
+	return nil
 }

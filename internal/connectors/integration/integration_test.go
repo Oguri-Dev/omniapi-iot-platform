@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"omniapi/adapters/dummy"
+	"omniapi/internal/adapters/dummy"
 	"omniapi/internal/connectors"
 	"omniapi/internal/domain"
 

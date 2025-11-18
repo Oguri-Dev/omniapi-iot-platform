@@ -1,47 +1,58 @@
-# Archivos binarios
+# Binary artifacts
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+omniapi.exe
+backend/omniapi.exe
 
-# Archivos de prueba
+# Test binaries & coverage
 *.test
-
-# Archivos de cobertura de prueba
 *.out
+backend/coverage_router_integration/
 
-# Dependencias
-vendor/
-
-# Variables de entorno
-.env
-
-# Archivos de logs
+# Logs
 *.log
 
-# Archivos temporales
-tmp/
-temp/
+# Dependencies & build outputs
+backend/vendor/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+backend/dist/
+backend/build/
+dist/
+build/
 
-# Archivos del sistema operativo
+# Environment files
+.env
+backend/.env
+backend/.env.local
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Temporary directories
+.tmp/
+tmp/
+.temp/
+temp/
+backend/tmp/
+backend/temp/
+
+# OS & IDE junk
 .DS_Store
 Thumbs.db
-
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Build artifacts
-dist/
-build/
-
-# Frontend (Node.js / React)
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/.env.local
-frontend/.env.*.local
+# Package managers (root-only)
+/package-lock.json
+/pnpm-lock.yaml
+/yarn.lock

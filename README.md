@@ -106,6 +106,7 @@ Vite serves the SPA on `http://localhost:5173` (or the next available port); use
 
 - `backend/README.md` – Deep dive into architecture, connector lifecycle, Prometheus queries, troubleshooting, etc.
 - `backend/internal/websocket/PROTOCOL.md` – Full WebSocket contract (DATA vs STATUS events, throttling, keep-latest policy, and sample clients).
+- `docs/CONNECTORS_MANUAL.md` – Manual de uso del dashboard de Conectores y discovery ScaleAQ.
 - Component-level docs live alongside the code (`internal/**`, `frontend/src/pages/**`).
 
 With this top-level README you can quickly understand how the repository is organized, what each stack is responsible for, and how to run or extend the platform end-to-end.

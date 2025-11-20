@@ -1,4 +1,3 @@
-import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -7,6 +6,7 @@ import Setup from './pages/Setup'
 import Dashboard from './pages/Dashboard'
 import DashboardHome from './pages/DashboardHome'
 import Services from './pages/Services'
+import Connectors from './pages/Connectors'
 import Tenants from './pages/Tenants'
 import Sites from './pages/Sites'
 import ExternalServices from './pages/ExternalServices'
@@ -32,7 +32,7 @@ function App() {
             <Route path="sites" element={<Sites />} />
             <Route path="external-services" element={<ExternalServices />} />
             <Route path="services" element={<Services />} />
-            <Route path="connectors" element={<div>Conectores (próximamente)</div>} />
+            <Route path="connectors" element={<Connectors />} />
             <Route path="settings" element={<div>Configuración (próximamente)</div>} />
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

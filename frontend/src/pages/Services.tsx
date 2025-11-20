@@ -1,21 +1,69 @@
-import React, { useState, useEffect } from 'react'
-import connectorService from '../services/connector.service'
-import type { ExternalService, CreateServiceDTO } from '../services/connector.service'
+import React, { useState, useEffect, useMemo } from 'react'
+import connectorService, {
+  type ExternalService as LegacyConnector,
+  type CreateServiceDTO,
+} from '../services/connector.service'
+import externalServiceService, {
+  type ExternalService as IntegrationService,
+} from '../services/externalService.service'
+import siteService, { type Site } from '../services/site.service'
+import discoveryService, { type ScaleAQDiscoveryResult } from '../services/discovery.service'
+import '../styles/Services.css'
 
 const Services: React.FC = () => {
-  const [services, setServices] = useState<ExternalService[]>([])
+  const [services, setServices] = useState<LegacyConnector[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [editingService, setEditingService] = useState<ExternalService | null>(null)
+  const [editingService, setEditingService] = useState<LegacyConnector | null>(null)
   const [formData, setFormData] = useState<CreateServiceDTO>({
     name: '',
     type: 'rest',
     url: '',
     auth_type: 'none',
   })
+  const [sites, setSites] = useState<Site[]>([])
+  const [integrationServices, setIntegrationServices] = useState<IntegrationService[]>([])
+  const [treeLoading, setTreeLoading] = useState(true)
+  const [expandedSites, setExpandedSites] = useState<Record<string, boolean>>({})
+  const [expandedConnectors, setExpandedConnectors] = useState<Record<string, boolean>>({})
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
+  const [discoveryCache, setDiscoveryCache] = useState<Record<string, ScaleAQDiscoveryResult>>({})
+  const [discoveryLoading, setDiscoveryLoading] = useState(false)
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+
+  const SCALEAQ_DATA_GROUPS = useMemo(
+    () => [
+      {
+        title: 'Meta',
+        description: 'Información estática del centro y la compañía',
+        items: [
+          { label: 'Company Info', endpoint: 'GET /meta/company?include=all' },
+          { label: 'Site Info', endpoint: 'GET /meta/sites/{siteId}?include=all' },
+        ],
+      },
+      {
+        title: 'Time Series',
+        description: 'Datos crudos capturados por ScaleAQ',
+        items: [
+          { label: 'Retrieve', endpoint: 'POST /time-series/retrieve' },
+          { label: 'Available Data Types', endpoint: 'POST /time-series/retrieve/data-types' },
+        ],
+      },
+      {
+        title: 'Aggregates',
+        description: 'Resúmenes por unidad y silos (feeding, biomasa, oxígeno)',
+        items: [
+          { label: 'Units Aggregate', endpoint: 'POST /time-series/retrieve/units/aggregate' },
+          { label: 'Silos Aggregate', endpoint: 'POST /time-series/retrieve/silos/aggregate' },
+        ],
+      },
+    ],
+    []
+  )
 
   useEffect(() => {
     loadServices()
+    loadConnectorTree()
   }, [])
 
   const loadServices = async () => {
@@ -30,6 +78,115 @@ const Services: React.FC = () => {
     }
   }
 
+  const loadConnectorTree = async () => {
+    try {
+      setTreeLoading(true)
+      const [sitesResponse, integrationsResponse] = await Promise.all([
+        siteService.getAll(),
+        externalServiceService.getAll(),
+      ])
+
+      if (sitesResponse.success) {
+        setSites(sitesResponse.data)
+      } else {
+        setSites([])
+      }
+
+      if (integrationsResponse.success) {
+        setIntegrationServices(integrationsResponse.data)
+      } else {
+        setIntegrationServices([])
+      }
+    } catch (error) {
+      console.error('Error loading connector tree:', error)
+      setSites([])
+      setIntegrationServices([])
+    } finally {
+      setTreeLoading(false)
+    }
+  }
+
+  const getSiteKey = (site: Site) => site.id || (site as any)._id || ''
+
+  const siteTree = useMemo(() => {
+    if (!sites || !integrationServices) return []
+
+    return sites.map((site) => {
+      const siteKey = getSiteKey(site)
+      const relatedConnectors = integrationServices.filter(
+        (service) => service.site_id === siteKey || service.site_id === (site as any)._id
+      )
+
+      return {
+        site,
+        siteKey,
+        connectors: relatedConnectors,
+      }
+    })
+  }, [sites, integrationServices])
+
+  useEffect(() => {
+    if (!selectedSiteId && siteTree.length > 0) {
+      const preferred = siteTree.find((entry) => entry.connectors.length > 0) ?? siteTree[0]
+      if (preferred) {
+        setSelectedSiteId(preferred.siteKey)
+        setExpandedSites((prev) => ({ ...prev, [preferred.siteKey]: true }))
+      }
+    }
+  }, [siteTree, selectedSiteId])
+
+  const selectedSiteNode = useMemo(() => {
+    return siteTree.find((entry) => entry.siteKey === selectedSiteId) || null
+  }, [siteTree, selectedSiteId])
+
+  const activeDiscovery = selectedSiteId ? discoveryCache[selectedSiteId] : null
+
+  const toggleSite = (siteKey: string) => {
+    setExpandedSites((prev) => ({
+      ...prev,
+      [siteKey]: !prev[siteKey],
+    }))
+  }
+
+  const toggleConnector = (connectorKey: string) => {
+    setExpandedConnectors((prev) => ({
+      ...prev,
+      [connectorKey]: !prev[connectorKey],
+    }))
+  }
+
+  const handleFocusSite = (siteKey: string) => {
+    setSelectedSiteId(siteKey)
+    setExpandedSites((prev) => ({
+      ...prev,
+      [siteKey]: true,
+    }))
+  }
+
+  const handleRunDiscovery = async (siteKey: string | null) => {
+    if (!siteKey) return
+    const node = siteTree.find((entry) => entry.siteKey === siteKey)
+    if (!node) return
+
+    setDiscoveryError(null)
+    setDiscoveryLoading(true)
+
+    try {
+      const result = await discoveryService.runScaleAQDiscovery(node.site, node.connectors)
+      setDiscoveryCache((prev) => ({
+        ...prev,
+        [siteKey]: result,
+      }))
+    } catch (error) {
+      console.error('Error running discovery:', error)
+      setDiscoveryError(
+        'No se pudo ejecutar el discovery. Revisa el conector ScaleAQ o vuelve a intentar.'
+      )
+    } finally {
+      setDiscoveryLoading(false)
+    }
+  }
+
   const handleCreate = () => {
     setEditingService(null)
     setFormData({
@@ -41,7 +198,7 @@ const Services: React.FC = () => {
     setShowModal(true)
   }
 
-  const handleEdit = (service: ExternalService) => {
+  const handleEdit = (service: LegacyConnector) => {
     setEditingService(service)
     setFormData({
       name: service.name,
@@ -96,6 +253,318 @@ const Services: React.FC = () => {
 
   return (
     <div className="services-page">
+      <section className="connector-tree">
+        <div className="connector-tree__header">
+          <div>
+            <h2>🌐 Conectores por Centro</h2>
+            <p className="connector-tree__subtitle">
+              Visualiza los datos disponibles agrupados por centro de cultivo y tipo de integración.
+            </p>
+          </div>
+          <button className="btn-secondary" onClick={loadConnectorTree} disabled={treeLoading}>
+            {treeLoading ? 'Actualizando...' : '↻ Actualizar tree'}
+          </button>
+        </div>
+
+        <div className="sites-strip">
+          <div className="sites-strip__header">
+            <div>
+              <h3>Centros conectados</h3>
+              <p>Selecciona un centro para ejecutar el discovery y revisar sus endpoints.</p>
+            </div>
+            <span className="sites-strip__count">{siteTree.length} centros</span>
+          </div>
+
+          <div className="sites-strip__list">
+            {siteTree.map(({ site, siteKey, connectors }) => (
+              <button
+                key={siteKey}
+                className={`site-pill ${selectedSiteId === siteKey ? 'is-active' : ''}`}
+                onClick={() => handleFocusSite(siteKey)}
+              >
+                <div className="site-pill__title">{site.name}</div>
+                <div className="site-pill__meta">
+                  {site.tenant_code} · {site.code}
+                </div>
+                <div className="site-pill__stats">
+                  <span>{connectors.length} conectores</span>
+                  <span>
+                    {connectors.filter((c) => c.service_type === 'scaleaq').length} ScaleAQ
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="discovery-panel">
+          <div className="discovery-panel__header">
+            <div>
+              <h3>Discovery ScaleAQ</h3>
+              <p>
+                Ejecuta el discovery usando el archivo de referencia para listar endpoints y
+                muestras reales.
+              </p>
+              {selectedSiteNode && (
+                <small>
+                  Centro seleccionado: <strong>{selectedSiteNode.site.name}</strong> · Site ID{' '}
+                  {selectedSiteNode.site.id || selectedSiteNode.site.code}
+                </small>
+              )}
+            </div>
+            <button
+              className="btn-primary"
+              onClick={() => handleRunDiscovery(selectedSiteId)}
+              disabled={!selectedSiteId || discoveryLoading}
+            >
+              {discoveryLoading ? 'Descubriendo...' : '▶ Ejecutar discovery'}
+            </button>
+          </div>
+
+          {discoveryError && <div className="discovery-panel__error">{discoveryError}</div>}
+
+          {discoveryLoading ? (
+            <div className="tree-loading">Consultando endpoints...</div>
+          ) : activeDiscovery ? (
+            <div className="discovery-output">
+              <div className="discovery-summary">
+                <div>
+                  <p className="muted">Última ejecución</p>
+                  <strong>{new Date(activeDiscovery.generatedAt).toLocaleString()}</strong>
+                </div>
+                <div>
+                  <p className="muted">Ventana cubierta</p>
+                  <strong>{activeDiscovery.summary.range}</strong>
+                </div>
+                <div>
+                  <p className="muted">Series detectadas</p>
+                  <strong>{activeDiscovery.summary.timeseriesCount}</strong>
+                </div>
+                <div>
+                  <p className="muted">KPIs</p>
+                  <strong>{activeDiscovery.summary.metricsAvailable}</strong>
+                </div>
+              </div>
+
+              <div className="discovery-headers">
+                <span>
+                  Scale-Version: <code>{activeDiscovery.headersUsed.scaleVersion}</code>
+                </span>
+                <span>
+                  Accept: <code>{activeDiscovery.headersUsed.accept}</code>
+                </span>
+              </div>
+
+              <div className="discovery-groups">
+                {activeDiscovery.groups.map((group) => (
+                  <div key={group.id} className="discovery-group">
+                    <div className="discovery-group__header">
+                      <div>
+                        <h4>{group.title}</h4>
+                        <p>{group.description}</p>
+                      </div>
+                      <span>{group.endpoints.length} endpoints</span>
+                    </div>
+                    <div className="discovery-group__body">
+                      {group.endpoints.map((endpoint) => {
+                        const dataset = endpoint.dataset
+                        return (
+                          <div key={endpoint.path} className="discovery-endpoint">
+                            <div className="discovery-endpoint__meta">
+                              <span
+                                className={`method-badge method-${endpoint.method.toLowerCase()}`}
+                              >
+                                {endpoint.method}
+                              </span>
+                              <code>{endpoint.path}</code>
+                              <span
+                                className={`availability availability-${endpoint.availability}`}
+                              >
+                                {endpoint.availability === 'ready'
+                                  ? 'Disponible'
+                                  : endpoint.availability === 'partial'
+                                  ? 'Parcial'
+                                  : 'Error'}
+                              </span>
+                            </div>
+                            <p>{endpoint.description}</p>
+                            {dataset && (
+                              <div className="discovery-dataset">
+                                <div className="discovery-dataset__title">{dataset.title}</div>
+                                {dataset.summary && (
+                                  <p className="discovery-dataset__summary">{dataset.summary}</p>
+                                )}
+                                {dataset.metrics && (
+                                  <div className="discovery-dataset__metrics">
+                                    {dataset.metrics.map((metric) => (
+                                      <div
+                                        key={metric.label}
+                                        className={`dataset-metric ${
+                                          metric.accent ? `is-${metric.accent}` : ''
+                                        }`}
+                                      >
+                                        <span>{metric.label}</span>
+                                        <strong>{metric.value}</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {dataset.highlights && (
+                                  <ul className="discovery-dataset__highlights">
+                                    {dataset.highlights.map((highlight) => (
+                                      <li key={highlight}>{highlight}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {dataset.table &&
+                                  (() => {
+                                    const table = dataset.table
+                                    return (
+                                      <div className="discovery-dataset__table">
+                                        <div className="table-header">
+                                          {table.columns.map((column) => (
+                                            <span key={column}>{column}</span>
+                                          ))}
+                                        </div>
+                                        {table.rows.map((row, index) => (
+                                          <div key={index} className="table-row">
+                                            {table.columns.map((column) => (
+                                              <span key={`${column}-${index}`}>
+                                                {row[column] as string}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )
+                                  })()}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="tree-empty">
+              Selecciona un centro y ejecuta el discovery para desplegar los endpoints del archivo
+              demo.
+            </div>
+          )}
+        </div>
+
+        {treeLoading ? (
+          <div className="tree-loading">Construyendo árbol de conectores...</div>
+        ) : siteTree.length === 0 ? (
+          <div className="tree-empty">No hay centros con conectores configurados.</div>
+        ) : (
+          <div className="tree-list">
+            {siteTree.map(({ site, siteKey, connectors }) => (
+              <div
+                key={siteKey}
+                className={`tree-site ${selectedSiteId === siteKey ? 'tree-site--active' : ''}`}
+              >
+                <button className="tree-site__toggle" onClick={() => toggleSite(siteKey)}>
+                  <span className="tree-arrow">{expandedSites[siteKey] ? '▾' : '▸'}</span>
+                  <div>
+                    <strong>{site.name}</strong>
+                    <small>
+                      {site.tenant_code} · Código interno: {site.code}
+                    </small>
+                  </div>
+                </button>
+
+                {expandedSites[siteKey] && (
+                  <div className="tree-site__content">
+                    {connectors.length === 0 ? (
+                      <p className="tree-placeholder">
+                        Este centro aún no tiene servicios vinculados.
+                      </p>
+                    ) : (
+                      connectors.map((connector) => {
+                        const connectorKey = `${siteKey}-${connector._id || connector.id}`
+                        const isScaleAQ = connector.service_type === 'scaleaq'
+                        const scaleaqSiteId =
+                          (connector.config?.scaleaq_site_id as string) || 'No definido'
+                        const scaleVersion =
+                          (connector.config?.scale_version as string) || '2025-01-01'
+                        const acceptHeader =
+                          (connector.config?.accept_header as string) || 'application/json'
+
+                        return (
+                          <div key={connectorKey} className="tree-connector">
+                            <button
+                              className="tree-connector__toggle"
+                              onClick={() => toggleConnector(connectorKey)}
+                            >
+                              <span className="tree-arrow">
+                                {expandedConnectors[connectorKey] ? '▾' : '▸'}
+                              </span>
+                              <div>
+                                <strong>{connector.name}</strong>
+                                <small>
+                                  {connector.service_type.toUpperCase()} · Estado {connector.status}
+                                </small>
+                              </div>
+                            </button>
+
+                            {expandedConnectors[connectorKey] && (
+                              <div className="tree-connector__details">
+                                <p>
+                                  <strong>Base URL:</strong> {connector.base_url}
+                                </p>
+                                {isScaleAQ && (
+                                  <div className="scaleaq-meta">
+                                    <span>
+                                      <strong>ScaleAQ Site ID:</strong> {scaleaqSiteId}
+                                    </span>
+                                    <span>
+                                      <strong>Headers:</strong> Scale-Version {scaleVersion} ·
+                                      Accept {acceptHeader}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {isScaleAQ ? (
+                                  <div className="scaleaq-groups">
+                                    {SCALEAQ_DATA_GROUPS.map((group) => (
+                                      <div key={group.title} className="scaleaq-group">
+                                        <h5>{group.title}</h5>
+                                        <p>{group.description}</p>
+                                        <ul>
+                                          {group.items.map((item) => (
+                                            <li key={item.endpoint}>
+                                              <span>{item.label}</span>
+                                              <code>{item.endpoint}</code>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="tree-placeholder">
+                                    Este conector aún no expone datos discovery. Configura ScaleAQ
+                                    para ver la jerarquía.
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <div className="page-header">
         <h1>Servicios Externos</h1>
         <button onClick={handleCreate} className="btn-primary">

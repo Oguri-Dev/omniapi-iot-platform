@@ -26,14 +26,22 @@ const ExternalServices: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
 
   // Form data
-  const [formData, setFormData] = useState<CreateExternalServiceDTO>({
+  const defaultScaleAQConfig = {
+    scale_version: '2025-01-01',
+    accept_header: 'application/json',
+    scaleaq_site_id: '',
+  }
+
+  const createInitialFormData = (): CreateExternalServiceDTO => ({
     site_id: '',
     name: '',
     service_type: 'scaleaq',
     base_url: '',
     credentials: {},
-    config: {},
+    config: { ...defaultScaleAQConfig },
   })
+
+  const [formData, setFormData] = useState<CreateExternalServiceDTO>(createInitialFormData())
 
   useEffect(() => {
     loadData()
@@ -80,18 +88,14 @@ const ExternalServices: React.FC = () => {
         service_type: service.service_type,
         base_url: service.base_url,
         credentials: {},
-        config: service.config || {},
+        config:
+          service.service_type === 'scaleaq'
+            ? { ...defaultScaleAQConfig, ...(service.config || {}) }
+            : service.config || {},
       })
     } else {
       setEditingService(null)
-      setFormData({
-        site_id: '',
-        name: '',
-        service_type: 'scaleaq',
-        base_url: '',
-        credentials: {},
-        config: {},
-      })
+      setFormData(createInitialFormData())
     }
     setShowModal(true)
   }
@@ -172,6 +176,16 @@ const ExternalServices: React.FC = () => {
       ...formData,
       credentials: {
         ...formData.credentials,
+        [field]: value,
+      },
+    })
+  }
+
+  const handleConfigChange = (field: string, value: string) => {
+    setFormData({
+      ...formData,
+      config: {
+        ...(formData.config || {}),
         [field]: value,
       },
     })
@@ -391,13 +405,18 @@ const ExternalServices: React.FC = () => {
                   <label>Tipo de Servicio *</label>
                   <select
                     value={formData.service_type}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const newType = e.target.value as CreateExternalServiceDTO['service_type']
                       setFormData({
                         ...formData,
-                        service_type: e.target.value as any,
-                        credentials: {}, // Reset credentials on type change
+                        service_type: newType,
+                        credentials: {},
+                        config:
+                          newType === 'scaleaq'
+                            ? { ...defaultScaleAQConfig, ...(formData.config || {}) }
+                            : {},
                       })
-                    }
+                    }}
                     required
                     disabled={!!editingService}
                   >
@@ -441,6 +460,39 @@ const ExternalServices: React.FC = () => {
                         value={formData.credentials?.password || ''}
                         onChange={(e) => handleCredentialChange('password', e.target.value)}
                         placeholder="••••••••"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Scale-Version header</label>
+                      <input
+                        type="text"
+                        value={
+                          (formData.config?.scale_version as string) ||
+                          defaultScaleAQConfig.scale_version
+                        }
+                        onChange={(e) => handleConfigChange('scale_version', e.target.value)}
+                        placeholder="2025-01-01"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Accept header</label>
+                      <input
+                        type="text"
+                        value={
+                          (formData.config?.accept_header as string) ||
+                          defaultScaleAQConfig.accept_header
+                        }
+                        onChange={(e) => handleConfigChange('accept_header', e.target.value)}
+                        placeholder="application/json"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>ScaleAQ Site ID</label>
+                      <input
+                        type="text"
+                        value={(formData.config?.scaleaq_site_id as string) || ''}
+                        onChange={(e) => handleConfigChange('scaleaq_site_id', e.target.value)}
+                        placeholder="Ej: 1521"
                       />
                     </div>
                   </>

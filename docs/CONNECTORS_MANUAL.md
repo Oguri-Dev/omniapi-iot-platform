@@ -18,10 +18,12 @@ Debajo se mantiene la parrilla de “Servicios Externos” original para registr
 ## 2. Componentes de la UI
 
 ### 2.1 Tira de Centros (`sites-strip`)
+
 - Cada “pill” muestra **nombre del centro**, **tenant**, **código interno** y la cantidad de conectores registrados.
 - Al hacer clic se expande automáticamente el nodo correspondiente en el árbol y se establece el contexto para el discovery.
 
 ### 2.2 Panel de Discovery
+
 - Botón principal **“▶ Ejecutar discovery”**: llama a `discoveryService.runScaleAQDiscovery(site, connectors)`.
 - Resumen superior con última ejecución, rango de datos cubierto y totales (series, KPIs).
 - Chips con los headers usados (`Scale-Version`, `Accept`) según la configuración almacenada en el conector ScaleAQ.
@@ -29,6 +31,7 @@ Debajo se mantiene la parrilla de “Servicios Externos” original para registr
 - El resultado queda cacheado por `siteId` para reabrirlo al cambiar de pestaña sin repetir la llamada.
 
 ### 2.3 Árbol por Centro
+
 - Dentro de cada sitio se listan los servicios externos vinculados.
 - Para conectores **ScaleAQ** se muestran los headers y el `scaleaq_site_id` configurados.
 - Si el conector no es ScaleAQ aparece un “placeholder” que explica que aún no expone discovery.
@@ -51,18 +54,18 @@ Debajo se mantiene la parrilla de “Servicios Externos” original para registr
 
 ## 4. Endpoints cubiertos en el demo
 
-| Grupo        | Método | Endpoint                                         | Descripción breve |
-|--------------|--------|--------------------------------------------------|-------------------|
-| Meta         | GET    | `/meta/company?include=all`                      | Info corporativa completa |
-| Meta         | GET    | `/meta/sites/{siteId}?include=all`               | Ficha detallada del centro |
-| Time Series  | POST   | `/time-series/retrieve`                          | Lecturas crudas por canal |
-| Time Series  | POST   | `/time-series/retrieve/data-types`               | Catálogo de canales y unidades |
-| Time Series  | POST   | `/time-series/retrieve/units/aggregate`          | Agregados por unidad de cultivo |
-| Time Series  | POST   | `/time-series/retrieve/silos/aggregate`          | Stock y consumo por silo |
-| Feeding      | GET    | `/feeding-dashboard/units?siteId={siteId}`       | KPIs de consumo/mortalidad |
-| Feeding      | GET    | `/feeding-dashboard/timeline?siteId={siteId}`    | Timeline consolidado de alimentación |
-| Analytics    | GET    | `/analytics/kpis?siteId={siteId}`                | Indicadores operacionales diarios |
-| Analytics    | POST   | `/analytics/export`                              | Exportación CSV con campos del archivo demo |
+| Grupo       | Método | Endpoint                                      | Descripción breve                           |
+| ----------- | ------ | --------------------------------------------- | ------------------------------------------- |
+| Meta        | GET    | `/meta/company?include=all`                   | Info corporativa completa                   |
+| Meta        | GET    | `/meta/sites/{siteId}?include=all`            | Ficha detallada del centro                  |
+| Time Series | POST   | `/time-series/retrieve`                       | Lecturas crudas por canal                   |
+| Time Series | POST   | `/time-series/retrieve/data-types`            | Catálogo de canales y unidades              |
+| Time Series | POST   | `/time-series/retrieve/units/aggregate`       | Agregados por unidad de cultivo             |
+| Time Series | POST   | `/time-series/retrieve/silos/aggregate`       | Stock y consumo por silo                    |
+| Feeding     | GET    | `/feeding-dashboard/units?siteId={siteId}`    | KPIs de consumo/mortalidad                  |
+| Feeding     | GET    | `/feeding-dashboard/timeline?siteId={siteId}` | Timeline consolidado de alimentación        |
+| Analytics   | GET    | `/analytics/kpis?siteId={siteId}`             | Indicadores operacionales diarios           |
+| Analytics   | POST   | `/analytics/export`                           | Exportación CSV con campos del archivo demo |
 
 ---
 
@@ -77,6 +80,7 @@ graph TD
 ```
 
 Cuando exista el endpoint real de discovery:
+
 1. `discoveryService.runScaleAQDiscovery` deberá invocar el backend (ej. `POST /api/discovery/scaleaq`).
 2. La respuesta debe respetar las interfaces de `types/discovery.ts` para mantener el rendering actual.
 

@@ -190,6 +190,38 @@ type ServiceCredentials struct {
 	CustomHeaders map[string]string `bson:"custom_headers,omitempty" json:"custom_headers,omitempty"`
 }
 
+// BuilderEndpointSelection describe un endpoint marcado en el builder de discovery
+type BuilderEndpointSelection struct {
+	EndpointID  string            `bson:"endpoint_id" json:"endpoint_id"`
+	Label       string            `bson:"label" json:"label"`
+	Method      string            `bson:"method" json:"method"`
+	Path        string            `bson:"path" json:"path"`
+	TargetBlock string            `bson:"target_block" json:"target_block"`
+	Params      map[string]string `bson:"params,omitempty" json:"params,omitempty"`
+}
+
+// BuilderSiteInfo describe el sitio asociado a una corrida del builder
+type BuilderSiteInfo struct {
+	ID         string `bson:"id,omitempty" json:"id,omitempty"`
+	Code       string `bson:"code,omitempty" json:"code,omitempty"`
+	Name       string `bson:"name,omitempty" json:"name,omitempty"`
+	TenantID   string `bson:"tenant_id,omitempty" json:"tenant_id,omitempty"`
+	TenantCode string `bson:"tenant_code,omitempty" json:"tenant_code,omitempty"`
+}
+
+// DiscoveryBuilderRun representa una ejecución del builder de discovery
+type DiscoveryBuilderRun struct {
+	ID               primitive.ObjectID         `bson:"_id,omitempty" json:"id,omitempty"`
+	Provider         string                     `bson:"provider" json:"provider"`
+	Site             BuilderSiteInfo            `bson:"site" json:"site"`
+	Endpoints        []BuilderEndpointSelection `bson:"endpoints" json:"endpoints"`
+	DiscoverySummary map[string]interface{}     `bson:"discovery_summary,omitempty" json:"discovery_summary,omitempty"`
+	Notes            string                     `bson:"notes,omitempty" json:"notes,omitempty"`
+	CreatedBy        string                     `bson:"created_by,omitempty" json:"created_by,omitempty"`
+	CreatedAt        time.Time                  `bson:"created_at" json:"created_at"`
+	UpdatedAt        time.Time                  `bson:"updated_at" json:"updated_at"`
+}
+
 // ValidationError estructura para errores de validación
 type ValidationError struct {
 	Field   string `json:"field"`

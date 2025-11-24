@@ -1,4 +1,5 @@
 export type DiscoveryAvailability = 'ready' | 'partial' | 'error'
+export type DiscoveryProvider = 'scaleaq' | 'innovex'
 
 export interface DiscoveryMetric {
   label: string
@@ -38,15 +39,13 @@ export interface DiscoveryGroup {
   endpoints: DiscoveryEndpoint[]
 }
 
-export interface ScaleAQDiscoveryResult {
+export interface DiscoveryResult {
+  provider: DiscoveryProvider
   siteId: string
   siteName: string
   tenantCode?: string
   generatedAt: string
-  headersUsed: {
-    scaleVersion: string
-    accept: string
-  }
+  headersUsed?: Record<string, string>
   summary: {
     timeseriesCount: number
     metricsAvailable: number
@@ -54,3 +53,5 @@ export interface ScaleAQDiscoveryResult {
   }
   groups: DiscoveryGroup[]
 }
+
+export type DiscoveryCache = Record<string, DiscoveryResult>

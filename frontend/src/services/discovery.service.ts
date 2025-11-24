@@ -1,7 +1,8 @@
 import type { ExternalService } from './externalService.service'
 import type { Site } from './site.service'
-import type { ScaleAQDiscoveryResult } from '../types/discovery'
+import type { DiscoveryResult, DiscoveryProvider, DiscoveryCache } from '../types/discovery'
 import { buildScaleAQDiscoverySample } from '../lib/scaleaqDiscoverySample'
+import { buildInnovexDiscoverySample } from '../lib/innovexDiscoverySample'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -13,12 +14,12 @@ const discoveryService = {
   runScaleAQDiscovery: async (
     site: Site,
     connectors: ExternalService[] = []
-  ): Promise<ScaleAQDiscoveryResult> => {
+  ): Promise<DiscoveryResult> => {
     const scaleConnector = connectors.find((conn) => conn.service_type === 'scaleaq')
     const siteIdFromConnector =
       (scaleConnector?.config?.scaleaq_site_id as string) || site.id || site.code
 
-    await sleep(600) // Simula latencia de red
+    await sleep(600)
 
     return buildScaleAQDiscoverySample({
       siteName: site.name,
@@ -29,7 +30,27 @@ const discoveryService = {
       acceptHeader: (scaleConnector?.config?.accept_header as string) || 'application/json',
     })
   },
+
+  runInnovexDiscovery: async (
+    site: Site,
+    connectors: ExternalService[] = []
+  ): Promise<DiscoveryResult> => {
+    const innovexConnector = connectors.find((conn) => conn.service_type === 'innovex')
+    const monitorId =
+      (innovexConnector?.config?.monitor_id as string) || site.code || site.id || 'monitor-unknown'
+    const meditionSample = (innovexConnector?.config?.medition as string) || 'oxygen'
+
+    await sleep(600)
+
+    return buildInnovexDiscoverySample({
+      siteName: site.name,
+      siteCode: site.code,
+      tenantCode: site.tenant_code,
+      monitorId,
+      meditionSample,
+    })
+  },
 }
 
-export type { ScaleAQDiscoveryResult }
+export type { DiscoveryResult, DiscoveryProvider, DiscoveryCache }
 export default discoveryService

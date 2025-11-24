@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"omniapi/internal/adapters"
+	"omniapi/internal/api/handlers"
 	"omniapi/internal/config"
 	"omniapi/internal/database"
-	"omniapi/internal/api/handlers"
 	"omniapi/internal/queue/requester"
 	"omniapi/internal/queue/status"
 	"omniapi/internal/router"
@@ -331,6 +331,9 @@ func main() {
 	http.HandleFunc("/api/schemas", handlers.ListSchemasHandler)
 	http.HandleFunc("/api/schemas/get", handlers.GetSchemaHandler)
 	http.HandleFunc("/api/schemas/validate", handlers.ValidateSchemaHandler)
+
+	// Configurar rutas del builder/discovery
+	http.HandleFunc("/api/discovery/runs", handlers.CORSMiddleware(handlers.DiscoveryRunsHandler))
 
 	// Configurar rutas WebSocket
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

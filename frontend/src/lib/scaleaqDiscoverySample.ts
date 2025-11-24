@@ -1,4 +1,4 @@
-import type { ScaleAQDiscoveryResult } from '../types/discovery'
+import type { DiscoveryResult } from '../types/discovery'
 
 export interface ScaleAQDiscoveryContext {
   siteName: string
@@ -11,19 +11,18 @@ export interface ScaleAQDiscoveryContext {
 
 const nowIso = () => new Date().toISOString()
 
-export const buildScaleAQDiscoverySample = (
-  context: ScaleAQDiscoveryContext
-): ScaleAQDiscoveryResult => {
+export const buildScaleAQDiscoverySample = (context: ScaleAQDiscoveryContext): DiscoveryResult => {
   const generatedAt = nowIso()
 
   return {
+    provider: 'scaleaq',
     siteId: context.siteId,
     siteName: context.siteName,
     tenantCode: context.tenantCode,
     generatedAt,
     headersUsed: {
-      scaleVersion: context.scaleVersion,
-      accept: context.acceptHeader,
+      'Scale-Version': context.scaleVersion,
+      Accept: context.acceptHeader,
     },
     summary: {
       timeseriesCount: 84,

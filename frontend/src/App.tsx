@@ -6,6 +6,7 @@ import Setup from './pages/Setup'
 import Dashboard from './pages/Dashboard'
 import DashboardHome from './pages/DashboardHome'
 import Services from './pages/Services'
+import Builder from './pages/Builder'
 import Connectors from './pages/Connectors'
 import Tenants from './pages/Tenants'
 import Sites from './pages/Sites'
@@ -33,6 +34,7 @@ function App() {
             <Route path="external-services" element={<ExternalServices />} />
             <Route path="services" element={<Services />} />
             <Route path="connectors" element={<Connectors />} />
+            <Route path="builder" element={<Builder />} />
             <Route path="settings" element={<div>Configuración (próximamente)</div>} />
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

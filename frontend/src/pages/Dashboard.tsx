@@ -44,6 +44,10 @@ const Dashboard: React.FC = () => {
             <span>🔗</span>
             Conectores
           </Link>
+          <Link to="/dashboard/builder" className="nav-item">
+            <span>🧱</span>
+            Builder
+          </Link>
           <Link to="/dashboard/settings" className="nav-item">
             <span>⚙️</span>
             Configuración

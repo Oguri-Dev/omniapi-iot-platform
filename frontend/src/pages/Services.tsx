@@ -7,8 +7,32 @@ import externalServiceService, {
   type ExternalService as IntegrationService,
 } from '../services/externalService.service'
 import siteService, { type Site } from '../services/site.service'
-import discoveryService, { type ScaleAQDiscoveryResult } from '../services/discovery.service'
+import discoveryService, {
+  type DiscoveryResult,
+  type DiscoveryProvider,
+  type DiscoveryCache,
+} from '../services/discovery.service'
+import EndpointBuilder, { type EndpointSelectionState } from '../components/EndpointBuilder'
+import { discoveryEndpointCatalog } from '../lib/discoveryEndpointCatalog'
+import type { BuilderViewMode } from '../types/builder'
 import '../styles/Services.css'
+
+const DISCOVERY_PROVIDERS: Array<{
+  id: DiscoveryProvider
+  label: string
+  description: string
+}> = [
+  {
+    id: 'scaleaq',
+    label: 'ScaleAQ',
+    description: 'Discovery basado en Time Series y Feeding del archivo demo.',
+  },
+  {
+    id: 'innovex',
+    label: 'Innovex',
+    description: 'Discovery de Innovex Dataweb (all_monitors, detail, lecturas y errores).',
+  },
+]
 
 const Services: React.FC = () => {
   const [services, setServices] = useState<LegacyConnector[]>([])
@@ -27,9 +51,16 @@ const Services: React.FC = () => {
   const [expandedSites, setExpandedSites] = useState<Record<string, boolean>>({})
   const [expandedConnectors, setExpandedConnectors] = useState<Record<string, boolean>>({})
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
-  const [discoveryCache, setDiscoveryCache] = useState<Record<string, ScaleAQDiscoveryResult>>({})
+  const [discoveryCache, setDiscoveryCache] = useState<DiscoveryCache>({})
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+  const [discoveryProvider, setDiscoveryProvider] = useState<DiscoveryProvider>('scaleaq')
+  // UI toggle: permite alternar entre la vista clásica de discovery y el nuevo builder
+  const [viewMode, setViewMode] = useState<BuilderViewMode>('discovery')
+  // Estado local con los endpoints marcados + parámetros personalizados
+  const [builderSelections, setBuilderSelections] = useState<
+    Record<string, EndpointSelectionState>
+  >({})
 
   const SCALEAQ_DATA_GROUPS = useMemo(
     () => [
@@ -55,6 +86,42 @@ const Services: React.FC = () => {
         items: [
           { label: 'Units Aggregate', endpoint: 'POST /time-series/retrieve/units/aggregate' },
           { label: 'Silos Aggregate', endpoint: 'POST /time-series/retrieve/silos/aggregate' },
+        ],
+      },
+    ],
+    []
+  )
+
+  const INNOVEX_DATA_GROUPS = useMemo(
+    () => [
+      {
+        title: 'Catálogo',
+        description: 'Monitores y sensores registrados en Innovex Dataweb.',
+        items: [
+          { label: 'All Monitors', endpoint: 'GET /api_dataweb/all_monitors/?active=all' },
+          { label: 'Monitor Detail', endpoint: 'GET /api_dataweb/monitor_detail/?monitor_id=' },
+        ],
+      },
+      {
+        title: 'Lecturas',
+        description: 'Últimos datos por sensor y medición.',
+        items: [
+          {
+            label: 'Monitor Sensor Last Data',
+            endpoint: 'GET /api_dataweb/monitor_sensor_last_data/?id={monitor_id}&medition=oxygen',
+          },
+          { label: 'Get Last Data', endpoint: 'GET /api_dataweb/get_last_data/?sensor_id=' },
+        ],
+      },
+      {
+        title: 'Históricos',
+        description: 'Consultas por rango de fechas (hasta 30 días).',
+        items: [
+          { label: 'Get Data Range', endpoint: 'GET /api_dataweb/get_data_range/' },
+          {
+            label: 'Monitor Sensor Time Data',
+            endpoint: 'GET /api_dataweb/monitor_sensor_time_data/',
+          },
         ],
       },
     ],
@@ -139,7 +206,69 @@ const Services: React.FC = () => {
     return siteTree.find((entry) => entry.siteKey === selectedSiteId) || null
   }, [siteTree, selectedSiteId])
 
-  const activeDiscovery = selectedSiteId ? discoveryCache[selectedSiteId] : null
+  const makeDiscoveryKey = (siteKey: string, provider: DiscoveryProvider) =>
+    `${siteKey}:${provider}`
+
+  const activeDiscoveryKey = selectedSiteId
+    ? makeDiscoveryKey(selectedSiteId, discoveryProvider)
+    : null
+
+  const activeDiscovery: DiscoveryResult | null = activeDiscoveryKey
+    ? discoveryCache[activeDiscoveryKey] ?? null
+    : null
+
+  const providerInfo = useMemo(
+    () => DISCOVERY_PROVIDERS.find((item) => item.id === discoveryProvider),
+    [discoveryProvider]
+  )
+
+  const providerConnectors = useMemo(() => {
+    if (!selectedSiteNode) return []
+    return selectedSiteNode.connectors.filter((conn) => conn.service_type === discoveryProvider)
+  }, [selectedSiteNode, discoveryProvider])
+
+  const builderCatalog = useMemo(() => {
+    return discoveryEndpointCatalog[discoveryProvider] || []
+  }, [discoveryProvider])
+
+  const builderSelectedCount = useMemo(() => {
+    return Object.values(builderSelections).filter((item) => item.enabled).length
+  }, [builderSelections])
+
+  // Al hacer toggle agregamos/removemos el endpoint seleccionado en el builder
+  const handleBuilderToggle = (endpointId: string, enabled: boolean) => {
+    setBuilderSelections((prev) => {
+      if (!enabled) {
+        const { [endpointId]: _, ...rest } = prev
+        return rest
+      }
+      return {
+        ...prev,
+        [endpointId]: {
+          enabled: true,
+          params: prev[endpointId]?.params || {},
+        },
+      }
+    })
+  }
+
+  // Persistimos los parámetros escritos por el usuario para cada endpoint
+  const handleBuilderParamChange = (endpointId: string, paramName: string, value: string) => {
+    setBuilderSelections((prev) => ({
+      ...prev,
+      [endpointId]: {
+        enabled: true,
+        params: {
+          ...(prev[endpointId]?.params || {}),
+          [paramName]: value,
+        },
+      },
+    }))
+  }
+
+  const handleClearBuilder = () => {
+    setBuilderSelections({})
+  }
 
   const toggleSite = (siteKey: string) => {
     setExpandedSites((prev) => ({
@@ -163,29 +292,57 @@ const Services: React.FC = () => {
     }))
   }
 
-  const handleRunDiscovery = async (siteKey: string | null) => {
-    if (!siteKey) return
-    const node = siteTree.find((entry) => entry.siteKey === siteKey)
+  const handleSelectProvider = (provider: DiscoveryProvider) => {
+    setDiscoveryProvider(provider)
+    setDiscoveryError(null)
+    setBuilderSelections({})
+  }
+
+  const handleRunDiscovery = async (provider: DiscoveryProvider) => {
+    if (!selectedSiteId) return
+    const node = siteTree.find((entry) => entry.siteKey === selectedSiteId)
     if (!node) return
+
+    const connectorsForProvider = node.connectors.filter(
+      (connector) => connector.service_type === provider
+    )
+
+    if (connectorsForProvider.length === 0) {
+      setDiscoveryError('Agrega un conector activo de este proveedor para ejecutar el discovery.')
+      return
+    }
 
     setDiscoveryError(null)
     setDiscoveryLoading(true)
 
     try {
-      const result = await discoveryService.runScaleAQDiscovery(node.site, node.connectors)
-      setDiscoveryCache((prev) => ({
+      let result: DiscoveryResult
+      if (provider === 'innovex') {
+        result = await discoveryService.runInnovexDiscovery(node.site, connectorsForProvider)
+      } else {
+        result = await discoveryService.runScaleAQDiscovery(node.site, connectorsForProvider)
+      }
+
+      const cacheKey = makeDiscoveryKey(selectedSiteId, provider)
+      setDiscoveryCache((prev: DiscoveryCache) => ({
         ...prev,
-        [siteKey]: result,
+        [cacheKey]: result,
       }))
     } catch (error) {
       console.error('Error running discovery:', error)
       setDiscoveryError(
-        'No se pudo ejecutar el discovery. Revisa el conector ScaleAQ o vuelve a intentar.'
+        provider === 'innovex'
+          ? 'No se pudo ejecutar el discovery Innovex. Verifica monitor_id y credenciales.'
+          : 'No se pudo ejecutar el discovery ScaleAQ. Revisa el conector o vuelve a intentar.'
       )
     } finally {
       setDiscoveryLoading(false)
     }
   }
+
+  useEffect(() => {
+    setBuilderSelections({})
+  }, [selectedSiteId])
 
   const handleCreate = () => {
     setEditingService(null)
@@ -276,182 +433,265 @@ const Services: React.FC = () => {
           </div>
 
           <div className="sites-strip__list">
-            {siteTree.map(({ site, siteKey, connectors }) => (
-              <button
-                key={siteKey}
-                className={`site-pill ${selectedSiteId === siteKey ? 'is-active' : ''}`}
-                onClick={() => handleFocusSite(siteKey)}
-              >
-                <div className="site-pill__title">{site.name}</div>
-                <div className="site-pill__meta">
-                  {site.tenant_code} · {site.code}
-                </div>
-                <div className="site-pill__stats">
-                  <span>{connectors.length} conectores</span>
-                  <span>
-                    {connectors.filter((c) => c.service_type === 'scaleaq').length} ScaleAQ
-                  </span>
-                </div>
-              </button>
-            ))}
+            {siteTree.map(({ site, siteKey, connectors }) => {
+              const providerCounts = connectors.reduce<Record<string, number>>((acc, connector) => {
+                acc[connector.service_type] = (acc[connector.service_type] || 0) + 1
+                return acc
+              }, {})
+
+              const providerBadges = [
+                { label: 'ScaleAQ', count: providerCounts.scaleaq || 0 },
+                { label: 'Innovex', count: providerCounts.innovex || 0 },
+              ].filter((badge) => badge.count > 0)
+
+              return (
+                <button
+                  key={siteKey}
+                  className={`site-pill ${selectedSiteId === siteKey ? 'is-active' : ''}`}
+                  onClick={() => handleFocusSite(siteKey)}
+                >
+                  <div className="site-pill__title">{site.name}</div>
+                  <div className="site-pill__meta">
+                    {site.tenant_code} · {site.code}
+                  </div>
+                  <div className="site-pill__stats">
+                    <span>{connectors.length} conectores</span>
+                    {providerBadges.length > 0 ? (
+                      providerBadges.map((badge) => (
+                        <span key={badge.label}>
+                          {badge.count} {badge.label}
+                        </span>
+                      ))
+                    ) : (
+                      <span>Sin proveedores</span>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
         <div className="discovery-panel">
           <div className="discovery-panel__header">
             <div>
-              <h3>Discovery ScaleAQ</h3>
-              <p>
-                Ejecuta el discovery usando el archivo de referencia para listar endpoints y
-                muestras reales.
-              </p>
+              <h3>Discovery {providerInfo?.label}</h3>
+              <p>{providerInfo?.description}</p>
               {selectedSiteNode && (
                 <small>
-                  Centro seleccionado: <strong>{selectedSiteNode.site.name}</strong> · Site ID{' '}
+                  Centro seleccionado: <strong>{selectedSiteNode.site.name}</strong> · ID{' '}
                   {selectedSiteNode.site.id || selectedSiteNode.site.code}
                 </small>
               )}
-            </div>
-            <button
-              className="btn-primary"
-              onClick={() => handleRunDiscovery(selectedSiteId)}
-              disabled={!selectedSiteId || discoveryLoading}
-            >
-              {discoveryLoading ? 'Descubriendo...' : '▶ Ejecutar discovery'}
-            </button>
-          </div>
-
-          {discoveryError && <div className="discovery-panel__error">{discoveryError}</div>}
-
-          {discoveryLoading ? (
-            <div className="tree-loading">Consultando endpoints...</div>
-          ) : activeDiscovery ? (
-            <div className="discovery-output">
-              <div className="discovery-summary">
-                <div>
-                  <p className="muted">Última ejecución</p>
-                  <strong>{new Date(activeDiscovery.generatedAt).toLocaleString()}</strong>
-                </div>
-                <div>
-                  <p className="muted">Ventana cubierta</p>
-                  <strong>{activeDiscovery.summary.range}</strong>
-                </div>
-                <div>
-                  <p className="muted">Series detectadas</p>
-                  <strong>{activeDiscovery.summary.timeseriesCount}</strong>
-                </div>
-                <div>
-                  <p className="muted">KPIs</p>
-                  <strong>{activeDiscovery.summary.metricsAvailable}</strong>
-                </div>
+              <div className="discovery-provider-tabs">
+                {DISCOVERY_PROVIDERS.map((option) => (
+                  <button
+                    key={option.id}
+                    className={`provider-tab ${discoveryProvider === option.id ? 'is-active' : ''}`}
+                    onClick={() => handleSelectProvider(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
-
-              <div className="discovery-headers">
-                <span>
-                  Scale-Version: <code>{activeDiscovery.headersUsed.scaleVersion}</code>
-                </span>
-                <span>
-                  Accept: <code>{activeDiscovery.headersUsed.accept}</code>
-                </span>
-              </div>
-
-              <div className="discovery-groups">
-                {activeDiscovery.groups.map((group) => (
-                  <div key={group.id} className="discovery-group">
-                    <div className="discovery-group__header">
-                      <div>
-                        <h4>{group.title}</h4>
-                        <p>{group.description}</p>
-                      </div>
-                      <span>{group.endpoints.length} endpoints</span>
-                    </div>
-                    <div className="discovery-group__body">
-                      {group.endpoints.map((endpoint) => {
-                        const dataset = endpoint.dataset
-                        return (
-                          <div key={endpoint.path} className="discovery-endpoint">
-                            <div className="discovery-endpoint__meta">
-                              <span
-                                className={`method-badge method-${endpoint.method.toLowerCase()}`}
-                              >
-                                {endpoint.method}
-                              </span>
-                              <code>{endpoint.path}</code>
-                              <span
-                                className={`availability availability-${endpoint.availability}`}
-                              >
-                                {endpoint.availability === 'ready'
-                                  ? 'Disponible'
-                                  : endpoint.availability === 'partial'
-                                  ? 'Parcial'
-                                  : 'Error'}
-                              </span>
-                            </div>
-                            <p>{endpoint.description}</p>
-                            {dataset && (
-                              <div className="discovery-dataset">
-                                <div className="discovery-dataset__title">{dataset.title}</div>
-                                {dataset.summary && (
-                                  <p className="discovery-dataset__summary">{dataset.summary}</p>
-                                )}
-                                {dataset.metrics && (
-                                  <div className="discovery-dataset__metrics">
-                                    {dataset.metrics.map((metric) => (
-                                      <div
-                                        key={metric.label}
-                                        className={`dataset-metric ${
-                                          metric.accent ? `is-${metric.accent}` : ''
-                                        }`}
-                                      >
-                                        <span>{metric.label}</span>
-                                        <strong>{metric.value}</strong>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {dataset.highlights && (
-                                  <ul className="discovery-dataset__highlights">
-                                    {dataset.highlights.map((highlight) => (
-                                      <li key={highlight}>{highlight}</li>
-                                    ))}
-                                  </ul>
-                                )}
-                                {dataset.table &&
-                                  (() => {
-                                    const table = dataset.table
-                                    return (
-                                      <div className="discovery-dataset__table">
-                                        <div className="table-header">
-                                          {table.columns.map((column) => (
-                                            <span key={column}>{column}</span>
-                                          ))}
-                                        </div>
-                                        {table.rows.map((row, index) => (
-                                          <div key={index} className="table-row">
-                                            {table.columns.map((column) => (
-                                              <span key={`${column}-${index}`}>
-                                                {row[column] as string}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )
-                                  })()}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+              <div className="discovery-view-tabs">
+                {(
+                  [
+                    { id: 'discovery', label: 'Vista discovery' },
+                    { id: 'builder', label: 'Menu builder' },
+                  ] as Array<{ id: BuilderViewMode; label: string }>
+                ).map((view) => (
+                  <button
+                    key={view.id}
+                    className={`view-tab ${viewMode === view.id ? 'is-active' : ''}`}
+                    onClick={() => setViewMode(view.id)}
+                  >
+                    {view.label}
+                  </button>
                 ))}
               </div>
             </div>
+            {viewMode === 'discovery' ? (
+              <button
+                className="btn-primary"
+                onClick={() => handleRunDiscovery(discoveryProvider)}
+                disabled={!selectedSiteId || discoveryLoading || providerConnectors.length === 0}
+              >
+                {discoveryLoading ? 'Descubriendo...' : '▶ Ejecutar discovery'}
+              </button>
+            ) : (
+              <button
+                className="btn-secondary"
+                onClick={handleClearBuilder}
+                disabled={builderSelectedCount === 0}
+              >
+                Limpiar selección
+              </button>
+            )}
+          </div>
+
+          {providerConnectors.length === 0 && selectedSiteNode && !discoveryLoading && (
+            <div className="discovery-panel__hint">
+              No hay conectores {providerInfo?.label} configurados para este centro. Agrega uno en
+              “Servicios Externos” para habilitar el discovery.
+            </div>
+          )}
+
+          {viewMode === 'discovery' && discoveryError && (
+            <div className="discovery-panel__error">{discoveryError}</div>
+          )}
+
+          {viewMode === 'discovery' ? (
+            discoveryLoading ? (
+              <div className="tree-loading">Consultando endpoints...</div>
+            ) : activeDiscovery ? (
+              <div className="discovery-output">
+                <div className="discovery-summary">
+                  <div>
+                    <p className="muted">Última ejecución</p>
+                    <strong>{new Date(activeDiscovery.generatedAt).toLocaleString()}</strong>
+                  </div>
+                  <div>
+                    <p className="muted">Proveedor</p>
+                    <strong>
+                      {activeDiscovery.provider === 'innovex' ? 'Innovex' : 'ScaleAQ'}
+                    </strong>
+                  </div>
+                  <div>
+                    <p className="muted">Ventana cubierta</p>
+                    <strong>{activeDiscovery.summary.range}</strong>
+                  </div>
+                  <div>
+                    <p className="muted">Series detectadas</p>
+                    <strong>{activeDiscovery.summary.timeseriesCount}</strong>
+                  </div>
+                  <div>
+                    <p className="muted">KPIs</p>
+                    <strong>{activeDiscovery.summary.metricsAvailable}</strong>
+                  </div>
+                </div>
+
+                {activeDiscovery.headersUsed && (
+                  <div className="discovery-headers">
+                    {Object.entries(activeDiscovery.headersUsed).map(([header, value]) => (
+                      <span key={header}>
+                        {header}: <code>{value}</code>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="discovery-groups">
+                  {activeDiscovery.groups.map((group) => (
+                    <div key={group.id} className="discovery-group">
+                      <div className="discovery-group__header">
+                        <div>
+                          <h4>{group.title}</h4>
+                          <p>{group.description}</p>
+                        </div>
+                        <span>{group.endpoints.length} endpoints</span>
+                      </div>
+                      <div className="discovery-group__body">
+                        {group.endpoints.map((endpoint) => {
+                          const dataset = endpoint.dataset
+                          return (
+                            <div key={endpoint.path} className="discovery-endpoint">
+                              <div className="discovery-endpoint__meta">
+                                <span
+                                  className={`method-badge method-${endpoint.method.toLowerCase()}`}
+                                >
+                                  {endpoint.method}
+                                </span>
+                                <code>{endpoint.path}</code>
+                                <span
+                                  className={`availability availability-${endpoint.availability}`}
+                                >
+                                  {endpoint.availability === 'ready'
+                                    ? 'Disponible'
+                                    : endpoint.availability === 'partial'
+                                    ? 'Parcial'
+                                    : 'Error'}
+                                </span>
+                              </div>
+                              <p>{endpoint.description}</p>
+                              {dataset && (
+                                <div className="discovery-dataset">
+                                  <div className="discovery-dataset__title">{dataset.title}</div>
+                                  {dataset.summary && (
+                                    <p className="discovery-dataset__summary">{dataset.summary}</p>
+                                  )}
+                                  {dataset.metrics && (
+                                    <div className="discovery-dataset__metrics">
+                                      {dataset.metrics.map((metric) => (
+                                        <div
+                                          key={metric.label}
+                                          className={`dataset-metric ${
+                                            metric.accent ? `is-${metric.accent}` : ''
+                                          }`}
+                                        >
+                                          <span>{metric.label}</span>
+                                          <strong>{metric.value}</strong>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {dataset.highlights && (
+                                    <ul className="discovery-dataset__highlights">
+                                      {dataset.highlights.map((highlight) => (
+                                        <li key={highlight}>{highlight}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  {dataset.table &&
+                                    (() => {
+                                      const table = dataset.table
+                                      return (
+                                        <div className="discovery-dataset__table">
+                                          <div className="table-header">
+                                            {table.columns.map((column) => (
+                                              <span key={column}>{column}</span>
+                                            ))}
+                                          </div>
+                                          {table.rows.map((row, index) => (
+                                            <div key={index} className="table-row">
+                                              {table.columns.map((column) => (
+                                                <span key={`${column}-${index}`}>
+                                                  {row[column] as string}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )
+                                    })()}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="tree-empty">
+                Selecciona un centro y ejecuta el discovery para desplegar los endpoints del archivo
+                demo.
+              </div>
+            )
+          ) : selectedSiteNode ? (
+            <EndpointBuilder
+              provider={discoveryProvider}
+              site={selectedSiteNode.site}
+              endpoints={builderCatalog}
+              selections={builderSelections}
+              onToggle={handleBuilderToggle}
+              onParamChange={handleBuilderParamChange}
+            />
           ) : (
             <div className="tree-empty">
-              Selecciona un centro y ejecuta el discovery para desplegar los endpoints del archivo
-              demo.
+              Selecciona un centro para comenzar a construir el payload de endpoints.
             </div>
           )}
         </div>
@@ -487,12 +727,16 @@ const Services: React.FC = () => {
                       connectors.map((connector) => {
                         const connectorKey = `${siteKey}-${connector._id || connector.id}`
                         const isScaleAQ = connector.service_type === 'scaleaq'
+                        const isInnovex = connector.service_type === 'innovex'
                         const scaleaqSiteId =
                           (connector.config?.scaleaq_site_id as string) || 'No definido'
                         const scaleVersion =
                           (connector.config?.scale_version as string) || '2025-01-01'
                         const acceptHeader =
                           (connector.config?.accept_header as string) || 'application/json'
+                        const monitorId =
+                          (connector.config?.monitor_id as string) || 'No configurado'
+                        const preferredMedition = (connector.config?.medition as string) || 'oxygen'
 
                         return (
                           <div key={connectorKey} className="tree-connector">
@@ -527,6 +771,16 @@ const Services: React.FC = () => {
                                     </span>
                                   </div>
                                 )}
+                                {isInnovex && (
+                                  <div className="innovex-meta">
+                                    <span>
+                                      <strong>Monitor ID:</strong> {monitorId}
+                                    </span>
+                                    <span>
+                                      <strong>Medición favorita:</strong> {preferredMedition}
+                                    </span>
+                                  </div>
+                                )}
 
                                 {isScaleAQ ? (
                                   <div className="scaleaq-groups">
@@ -545,10 +799,26 @@ const Services: React.FC = () => {
                                       </div>
                                     ))}
                                   </div>
+                                ) : isInnovex ? (
+                                  <div className="scaleaq-groups">
+                                    {INNOVEX_DATA_GROUPS.map((group) => (
+                                      <div key={group.title} className="scaleaq-group">
+                                        <h5>{group.title}</h5>
+                                        <p>{group.description}</p>
+                                        <ul>
+                                          {group.items.map((item) => (
+                                            <li key={item.endpoint}>
+                                              <span>{item.label}</span>
+                                              <code>{item.endpoint}</code>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ))}
+                                  </div>
                                 ) : (
                                   <p className="tree-placeholder">
-                                    Este conector aún no expone datos discovery. Configura ScaleAQ
-                                    para ver la jerarquía.
+                                    Este conector aún no expone datos discovery en esta vista.
                                   </p>
                                 )}
                               </div>

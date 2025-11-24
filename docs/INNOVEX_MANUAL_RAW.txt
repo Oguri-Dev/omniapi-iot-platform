@@ -1,0 +1,399 @@
+API Dataweb V.2
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Indice
+Introducción............................................................................................................................................... 3
+Registrar aplicación....................................................................................................................................4
+Generando token de autorización...............................................................................................................6
+Obteniendo un token mediante Resource owner password-based........................................................ 6
+Obteniendo un token mediante authorization code............................................................................... 7
+Obteniendo un token mediante implicit................................................................................................ 8
+Obteniendo un token mediante client credential................................................................................... 9
+Actualizando tokens...................................................................................................................................9
+Consumo de API...................................................................................................................................... 10
+Consultas............................................................................................................................................. 10
+https://dataweb.innovex.cl/api_dataweb/all_monitors/.................................................................. 10
+https://dataweb.innovex.cl/api_dataweb/monitor_detail/............................................................... 11
+https://dataweb.innovex.cl/api_dataweb/monitor_sensor_last_data/............................................. 12
+https://dataweb.innovex.cl/api_dataweb/get_last_data/................................................................. 13
+https://dataweb.innovex.cl/api_dataweb/get_data_range/.............................................................. 13
+https://dataweb.innovex.cl/api_dataweb/monitor_sensor_time_data/............................................14
+Errores......................................................................................................................................................15
+Ejemplo en javascript para la obtención de token....................................................................................16
+Ejemplo practico, obtención de datos mediante token.............................................................................16
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Introducción
+En este documento, se explicará la manera de extraer datos de diferentes centros o
+boyas oceanografías mediante el API de la aplicación dataweb. Para un correcto uso, se
+debe poseer un usuario y contraseña previamente creados por personal de soporte técnico
+de Innovex SpA, ya que no existe un formulario de registro hacia el sistema principal.
+Esta API esta basada en Oauth2, por lo que es necesario registrar la aplicación que se usara
+en un link que estará habilitado solo par los usuarios registrados. En ese link se podrán crear
+el  client_id  y  client_secret  necesarios  para  generar  los  tokens  de  autorización. En  este
+registro  se  podrán  elegir  distintas  maneras  de  autorización  dependiendo  de  los
+requerimientos del usuario. Se recomienda usar el método de autorización “Resource owner
+password-based”.
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Registrar aplicación 
+Para registrar aplicaciones, es necesario estar autenticado en el sistema dataweb, una
+vez adentro se desplegara la siguiente pantalla.
+Link: https://dataweb.innovex.cl/api_register/applications/
+Aquí mostrara una lista de todas las aplicaciones registradas en el sistema y un botón
+para poder agregar otras.
+El formulario para registrar una nueva aplicación es el siguiente:
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Name: es el nombre que recibe el registro de la aplicación, este campo no afecta al
+momento de acceder al API, pero si para diferenciarlo.
+Client_id:  es el id que recibirá el registro, aquí puede ir cualquier valor, pero es
+importante al momento de generar tokens de autenticación.
+Client_secret: en este campo también puede ir cualquier valor, pero no debe ir vacío,
+ya que es necesario para generar tokens de autenticación.
+Client_type:  pueden  haber  2  configuración,  public  o  confidential,  este  debe  ser
+elegido por el usuario, se recomienda confidential.
+Authorization grant type :  se deben escoger las opciones que m ás acomoden al
+cliente, dependiendo del tipo de aplicación desde el se extraigan los datos, se recomienda
+resource owner password-based para facilitar el uso del API.
+Redirect url: necesario solo para la opción authotization code, esta es la url a la cual
+se redireccionará una vez que se obtenga la autorización junto con el código.
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Generando token de autorización
+Para consumir el API de Innovex se debe poseer tokens de autenticación que genera el
+sistema  mediante  el  sistema  de  Oauth2.  Para  la  obtención  correcta  de  los  tokens  es
+necesario  tener  en  cuenta  que  dependiendo  del  Authorization  grant  type  configurado
+previamente en el registro de aplicaciones se harán las consultas para la generación de
+tokens.
+Teniendo  en  cuenta  todo  lo  anterior,  se  explicara  como  obtener  tokens  con  los
+diferentes tipos de authorization grant type. Para una mejor explicación, supongamos que
+tenemos  un  servidor  local  corriendo  en  http://127.0.0.1  en  el  puerto  8000  y  un  archivo
+index.html  (su  contenido  estará  descrito  más  abajo),  entonces  se  registrara  una  nueva
+aplicación en https://dataweb.innovex.cl/api_register/applications/ con los siguientes datos:
+• client_id: id_client
+• client_secret: secret_client
+• redirect uri: http://127.0.0.1:8000/
+• client type: confidential
+• authorization grant type: Resource owner password-based
+• name: Whichever
+Obteniendo un token mediante Resource owner password-based (Recomendado)
+Para obtener un token mediante este tipo de autenticación, es necesario tener un 
+usuario y contraseña.
+Ejemplo con curl:
+ curl -u cliente_id:client_secret https://dataweb.innovex.cl/api_register/token/ -d
+ 'grant_type=password&username=<usuario>&password=<contraseña>'
+Ejemplo JavaScript:
+var params = { method: 'POST',
+headers: {
+'Accept': 'application/json', 
+'Content-Type': 'application/x-www-form-urlencoded'},
+body:
+"username='usuario'&password='contraseña'&grant_type='password'&client_id='client_i
+d'&client_secret='cliente_id'" };
+fetch('https://dataweb.innovex.cl/api_register/token/', params).then((response) =>
+  response.json()).then((responseJson) => { console.log(responseJson); });
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Obteniendo un token mediante authorization code
+Teniendo  ya  la  aplicación  registrada,  se  debe  proseguir  a  obtener  un  código  de
+autorización en este link  https://dataweb.innovex.cl/api_register/authorize/, esta url es la que
+se encargara de validar que la aplicación registrada puede obtener un token. Ejemplo colocar
+esta url en el navegador:
+https://dataweb.innovex.cl/api_register/authorize?
+response_type=code&client_id=client_id&redirect_uri=http://127.0.0.1:8000/
+En donde aparecerá el siguiente cuadro:
+Clickear  en  “Authorize”  y  nos  redirigirá  a  http://127.0.0.1:8000/?
+code=jvQa7oIlUKXCRddoqg76ewdBGWY8qK,  en  donde  el  parámetro  code es  nuestro
+código  de  autorización  que  tiene  como  tiempo  de  expiración  1  minuto.  Importante
+mencionar que el parámetro redirect_uri, debe tener como valor el mismo que se registro en
+la sección de aplicaciones.
+Descripción del link /api_register/authorize/
+• Método: GET
+• Response_type: code
+• Client id: client_id registered
+• Client_secret: client secret registered
+• redirect_uri: url en donde se redirigirá una vez creado el código de autorización
+• state: random_state_string 
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Una vez teniendo nuestro c ódigo de autorización, podemos obtener nuestros tokens
+usando  nuestra  credenciales  para  entrar  al  sistema  y  algunos  parámetros  de  Oauth2.
+Ejemplo de request mediante curl
+curl -u <usuario>:<contraseña> 127.0.0.1:8000/api_register/token/ -d 
+'grant_type=authorization_code&code=tX3NejyxkxiCNhNj7EMxUr5mFfmokz&client_id=clie
+nt_id&client_secret=client_secret&redirect_uri=http://127.0.0.1:8000/api_dataweb/'
+Esto, nos devolvera un json con la informaci ón necesaria para poder trabajar nuestro
+token. Cabe destacar que tiene un tiempo de expiración de 10 horas.
+Ejemplo de respuesta del servidor:
+{expires_in:  36000,  refresh_token:  "fLFacTAaX4WeNQ8fPXZY61kdxPYFeh",  token_type:
+"Bearer", access_token: "F05lqSDM0mv3Upx9k0uZsqgVG7nk4N", scope: "read write"}
+Obteniendo un token mediante implicit
+Es similar a la obtenci ón de un token mediante authorization code, solo que esta vez
+devuelve el token en la url. Ejemplo, coloca esta url en el navegador:
+https://dataweb.innovex.cl/api_register/authorize/?
+response_type=token&client_id=client_id_implicit&redirect_uri=http://127.0.0.1:8000/
+aparecerá este cuadro:
+damos en authorize y en la url del navegador aparecerá:
+http://127.0.0.1:8000/
+#access_token=23StQtQSmaibZVggG1Fohgzb9u8fLY&scope=write+read&state=&expires_in
+=36000&token_type=Bearer
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Obteniendo un token mediante client credential
+Se puede obtener un token usando el m étodo básico de autenticación, con el usuario
+y contraseña. Ejemplo con curl
+curl -u cliente_id:client_secret https://dataweb.innovex.cl/api_register/token/ -d 
+'grant_type=client_credentials'
+O con el método POST
+curl https://dataweb.innovex.cl/api_register/token/ -d 
+'grant_type=client_credentials&client_id=cliente_id&client_secret=client_secret' 
+Actualizando tokens
+Supongamos que hemos solicitado un token y nuestra respuesta del servidor fue
+exitosa, por ende nos devolvió el siguiente json:
+{"scope": "write read", 
+"access_token":"7H1VKMx0ruXeLjUr8LGoBrV58UB6sT", 
+"refresh_token": "3sGb46AngXb9fnJmqu6gbRZHfDs6Oo", 
+"expires_in": 36000, 
+"token_type": "Bearer"}
+Esta respuesta incluyo un refresh_token, el cual nos permitir á obtener un nuevo token
+de acceso antes de su actual token de acceso expire. Ejemplo con curl
+curl -u cliente_id:client_secret https://dataweb.innovex.cl/api_register/token/ -d 
+'grant_type=refresh_token&refresh_token=3sGb46AngXb9fnJmqu6gbRZHfDs6Oo'  
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Consumo de API
+Todas las consultas hacia el API, deben ser con el m étodo GET, de otra manera no
+devolverá lo solicitado. L as mediciones viene con un campo llamado timestamp, que es la
+representación de la fecha de la medición en unixtime.
+Consultas
+Para poder tener acceso a los datos mediante estas urls es necesario estar logeado o
+tener un token de acceso a la API.
+1. https://  dataweb  .innovex.cl/api_dataweb/all_monitors/  ,  permite  obtener  todos  los
+centros  asociados  a  la empresa  asociada  al  usuario  que  hace  la  consulta.  Ejemplo  de
+respuesta:
+*Por defecto entrega solos los centros activos
+Párametros:
+• Method: GET
+• active: corresponde al campo para filtrar centros activos e inactivos.
+◦ ‘all’: entrega todos los centros.
+◦ ‘false’: entrega los centros inactivos.
+Descripción respuesta: 
+Tipo respuesta: Array
+• id: id de centro o monitor
+• monitor_name: representa el nombre del centro registrado en la base de
+datos.
+• monitor_key: es necesario para hacer consultas especificas de un centro
+mediante el API
+• latitude: ubicación de centro
+• longitude: ubicación de centro 
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+2. https://  dataweb  .innovex.cl/api_dataweb/  monitor_detail  /  , permite obtener los nombre de
+los dispositivos instalados en terreno registrados en nuestra base de datos
+Párametros:
+• Method: GET
+• monitor_id: corresponde al id del campo montor que se obtiene en la consulta 
+'all_monitors'
+Descripción respuesta:
+Tipo respuesta: Json
+• response: contenedor de respuesta
+◦ sensors: tipo array, 
+▪ logger: tipo json
+• id: logger id
+• name: nombre dispositivo
+• active: boolean
+• number: numero de dispositivo en terreno 
+• type_logger: uso interno
+• firmware: uso interno
+• pancoordinator: uso interno
+▪ sensor tipo json
+• id: sensor_id
+• name: nombre de sensor en nuestra base de datos
+• number: número de dispositivo en terreno
+• silo: nombre de silo, si correspondiera
+• jaula: nombre de jaula, si correspondiera
+• cage_number: número de jaula
+• module: nombre de modulo, si correspondiera
+• sma: boolean
+• depth_detail: tipo json
+◦ quantity: integer
+◦ measurement: string
+▪ medition: tipo de sensor
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+3. http  s  ://dataweb.innovex.cl/api_dataweb/monitor_sensor_last_data/  ,  permite  obtener
+los últimos datos de todos los sensores de un centro en especifico.
+Párametros:
+• Method: GET
+• id: corresponde al id del centro o monitor
+• medition: puede ser, oxygen, flow, weather, turbidity, pH o cond (conductividad)
+Descripción de respuesta:
+Tipo de respuesta: array con dispositivos
+• logger: tipo json
+◦ id: logger id
+◦ name: nombre dispositivo
+◦ active: boolean
+◦ number: numero de dispositivo en terreno 
+• sensor: tipo json
+◦ id: sensor_id
+◦ name: nombre de sensor en nuestra base de datos
+◦ number: número de dispositivo en terreno
+◦ silo: nombre de silo, si correspondiera
+◦ jaula: nombre de jaula, si correspondiera
+◦ cage_number: número de jaula
+◦ module: nombre de modulo, si correspondiera
+◦ sma: boolean
+◦ depth_detail: tipo json
+▪ quantity: integer
+▪ measurement: string
+• last_data: tipo json
+◦ timestamp: tiempo en unixtime
+◦ oxygen: medición float
+◦ temperature:  medición float
+◦ saturation: medición float
+◦ salinity: medición  float
+◦ depth: int, profundidad del sensor
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+4. http  s  ://  dataweb  .innovex.cl/api_dataweb/get_last_data/  , obtiene los últimos datos de un
+sensor en particular.
+Párametros:
+• Method: GET
+• monitor_id: id del centro
+• sensor_id: id del sensor
+Descripción de respuesta
+Tipo de respuesta: Json
+• timestamp: tiempo en unixtime
+• oxygen: medición float
+• temperature:  medición float
+• saturation: medición float
+• salinity: medición  float
+• depth: int, profundidad del sensor 
+5. h  ttp  s  ://  d  ataweb.  innovex.cl/api_dataweb/get_data_range/  , obtiene los datos de un 
+rango de fechas de un sensor en particular.
+Párametros:
+• Method: GET
+• monitor_id: id de un centro
+• sensor_id:  id de un sensor 
+• unixtime_since: fecha en  unixtime format, comienzo de la consulta.
+• unixtime_until: fecha en unixtime format,  fin de la consulta
+Ejemplo campo unixtime:
+• unixtime_sice = 1506988800 → 03/10/2017 00:00:00 (GMT)
+• unixtime_until = 1507075200 → 04/10/2017 00:00:00 (GMT)
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+6. https://dataweb.innovex.cl/api_dataweb/monitor_sensor_time_data/, obtiene los datos 
+en un rango de fechas de máximo 30 días de los sensores de una medición y centro en 
+especifico
+Párametros:
+• Method: GET
+• monitor_id: id de un centro
+• medition:  medición del sensor
+• unixtime_since: fecha en  unixtime format, comienzo de la consulta.
+• unixtime_until: fecha en unixtime format,  fin de la consulta
+Descripción de respuesta:
+Tipo de respuesta: array con sensores
+• sensor: tipo json
+◦ main_data: tipo json
+▪ id: sensor id
+▪ name: nombre del sensor en nuestra base de datos
+▪ number: numero de dispositivo en terreno
+▪ sma: sensor corresponde a sincronización hacia sma
+▪ medition: tipo de sensor
+▪ jaula: nombre de la jaula
+▪ cage_number: número de jaula
+▪ depth: profundidad en que se encuentra el sensor actualmente
+▪ depth_detail: json
+• quantity: integer
+• measurement: string
+▪ module: nombre del modulo
+▪ monitor_id: id del centro al que esta asociado el sensor
+◦ logger: tipo json
+▪ id: logger id
+▪ name: nombre del logger
+▪ number: numero de dispositivo en terreno
+▪ active: boolean, estado de logger
+◦ medition_data: tipo json, este campo varia según el tipo de sensor
+▪ timestamp: array con las fechas y horas de mediciones 
+▪ oxygen json: oxygen, saturation, temperature, salinity, depth
+▪ flow json: speed, direction, temperature, depth
+▪ weather json: wind_speed, wind_direction, air_temperature, 
+pressure, wave_height
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Errores
+A continuación están los errores que puede devolver el api como respuesta final
+1. Unauthorized sensor information: 
+1. <JSON>, devuelve este error cuando el sensor id y monitor id no corresponden.
+1. Respuesta: {'response': 'Unauthorized sensor information'}
+2. Miss information: 
+1. <JSON>, retorna esta respuesta cuando falta algún parámetro en la consulta.
+1. Respuesta: {'response': Miss information''}
+3. Internal error: 
+1. <JSON>, retorna cuando se produjo algún error en el servidor.
+1. Respuesta: {'response': 'Internal error’}
+4. Not found: 
+1. <JSON>, retorna cuando no se encontro la información
+1. Respuesta {'response': 'Not found'}
+5. Method Not Allowed: 
+1. <JSON>, retorna cuando el método no es el que acepta el end point
+1. Respuesta: {'response': 'Method Not Allowed'}
+6. Access Denied: 
+1. <JSON>, retorna cuando el usuario no tiene acceso a la información
+1. Respuesta: {'response': 'Access Denied'}
+7. Time out:
+1. <JSON>, retorna time out cuando las respuestas en los datos de sensores 
+demoran más de 5 segundos. Este error se puede encontrar en las consultas de 
+últimos datos y rango de datos, específicamente en el campo ‘last_data’ de las 
+consultas de últimos datos y {'response': ‘time out'} cuando sea un consulta de 
+rango.
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl
+
+Ejemplo en javascript para la obtención de token mediante resource 
+owner password
+<script>
+var params = { method: 'POST', 
+headers: {'Accept': 'application/json', 
+'Content-Type': 'application/x-www-form-urlencoded'},
+body:"username=’usuario’&password=’contraseña’&grant_type=’password’&client_id=’client_i
+d’&client_secret=’cliente_id’"};
+fetch('https://dataweb.innovex.cl/api_register/token/', params).then((response) => 
+response.json()).then((responseJson) => { console.log(responseJson); });
+</script>
+Ejemplo practico, obtención de datos mediante token
+<script src="http://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script type="text/javascript" >
+var get_data_from_dataweb = function(data) {
+return $.ajax({
+url: 'https://dataweb.innovex.cl/api_dataweb/monitor_sensor_last_data/', 
+type: 'GET',
+data: data,
+dataType: 'json',
+beforeSend: function (xhr) { 
+xhr.setRequestHeader("Authorization","Bearer "+data.acs _token); 
+},
+}); 
+};
+var object = {'acs_token': '<mytoken>', 'monitor': 'monitor_id', 'medition': 'oxygen'};
+get_data_from_dataweb(object).done(function(response){ 
+console.log(response);
+ }); 
+</script>
+Innovex SpA, Valdivia Sevilla 204
+Autor: Ismael Aude Barría - hernan.aude@innovex.cl

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import type { Site } from '../services/site.service'
 import type { DiscoveryProvider } from '../services/discovery.service'
 import type {
@@ -29,6 +29,11 @@ const EndpointBuilder: React.FC<EndpointBuilderProps> = ({
   onToggle,
   onParamChange,
 }) => {
+  const [sampleResponses, setSampleResponses] = useState<
+    Record<string, { status: 'success' | 'error'; payload: string }>
+  >({})
+  const [testingEndpoint, setTestingEndpoint] = useState<string | null>(null)
+
   const grouped = useMemo(() => {
     return endpoints.reduce<Record<string, BuilderEndpointMeta[]>>((acc, item) => {
       if (!acc[item.category]) {
@@ -38,6 +43,16 @@ const EndpointBuilder: React.FC<EndpointBuilderProps> = ({
       return acc
     }, {})
   }, [endpoints])
+
+  const normalizedSite = useMemo(() => {
+    if (!site) return null
+    return {
+      id: (site.id as string) || ((site as any)._id as string) || 'unknown-site',
+      name: site.name,
+      code: site.code,
+      tenantCode: site.tenant_code,
+    }
+  }, [site])
 
   const selectedEndpoints = useMemo(() => {
     return endpoints
@@ -55,22 +70,59 @@ const EndpointBuilder: React.FC<EndpointBuilderProps> = ({
   const preview: BuilderPayloadPreview | null = useMemo(() => {
     if (!site || selectedEndpoints.length === 0) return null
 
+    if (!normalizedSite) return null
+
     return {
       provider,
-      site: {
-        id: (site.id as string) || ((site as any)._id as string) || 'unknown-site',
-        name: site.name,
-        code: site.code,
-        tenantCode: site.tenant_code,
-      },
+      site: normalizedSite,
       generatedAt: new Date().toISOString(),
       endpoints: selectedEndpoints,
     }
-  }, [provider, site, selectedEndpoints])
+  }, [provider, normalizedSite, selectedEndpoints])
 
   const handleCopy = () => {
     if (!preview) return
     navigator.clipboard.writeText(JSON.stringify(preview, null, 2))
+  }
+
+  const handleTestEndpoint = async (endpoint: BuilderEndpointMeta) => {
+    if (!endpoint.makeSampleResponse) return
+    if (!normalizedSite) {
+      setSampleResponses((prev) => ({
+        ...prev,
+        [endpoint.id]: {
+          status: 'error',
+          payload: 'Selecciona un sitio antes de probar el endpoint.',
+        },
+      }))
+      return
+    }
+
+    const selection = selections[endpoint.id]
+    setTestingEndpoint(endpoint.id)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 350))
+      const sample = endpoint.makeSampleResponse({
+        provider,
+        site: normalizedSite,
+        params: selection?.params,
+      })
+      setSampleResponses((prev) => ({
+        ...prev,
+        [endpoint.id]: { status: 'success', payload: JSON.stringify(sample, null, 2) },
+      }))
+    } catch (error) {
+      setSampleResponses((prev) => ({
+        ...prev,
+        [endpoint.id]: {
+          status: 'error',
+          payload:
+            error instanceof Error ? error.message : 'No se pudo generar la respuesta de prueba.',
+        },
+      }))
+    } finally {
+      setTestingEndpoint(null)
+    }
   }
 
   return (
@@ -86,11 +138,21 @@ const EndpointBuilder: React.FC<EndpointBuilderProps> = ({
               {items.map((endpoint) => {
                 const selection = selections[endpoint.id]
                 const enabled = Boolean(selection?.enabled)
+                const hasMissingRequiredParams = Boolean(
+                  enabled &&
+                    endpoint.params?.some((param) =>
+                      param.required ? !selection?.params?.[param.name]?.trim() : false
+                    )
+                )
+                const sampleResponse = sampleResponses[endpoint.id]
+                const showSample = Boolean(enabled && sampleResponse)
+                const cardClassNames = [
+                  'endpoint-card',
+                  enabled ? 'is-active' : '',
+                  showSample ? 'endpoint-card--wide' : '',
+                ]
                 return (
-                  <article
-                    key={endpoint.id}
-                    className={`endpoint-card ${enabled ? 'is-active' : ''}`}
-                  >
+                  <article key={endpoint.id} className={cardClassNames.filter(Boolean).join(' ')}>
                     <div className="endpoint-card__header">
                       <label className="endpoint-card__toggle">
                         <input
@@ -105,6 +167,9 @@ const EndpointBuilder: React.FC<EndpointBuilderProps> = ({
                     <p className="endpoint-card__path">{endpoint.path}</p>
                     <p className="endpoint-card__description">{endpoint.description}</p>
                     <p className="endpoint-card__target">Bloque destino: {endpoint.targetBlock}</p>
+                    {endpoint.sampleResponseHint && (
+                      <p className="endpoint-card__hint">{endpoint.sampleResponseHint}</p>
+                    )}
                     {enabled && endpoint.params && (
                       <div className="endpoint-card__params">
                         {endpoint.params.map((param) => (
@@ -123,6 +188,39 @@ const EndpointBuilder: React.FC<EndpointBuilderProps> = ({
                             )}
                           </label>
                         ))}
+                      </div>
+                    )}
+                    {enabled && endpoint.makeSampleResponse && (
+                      <div className="endpoint-card__actions">
+                        <button
+                          type="button"
+                          className="btn-tertiary"
+                          disabled={
+                            testingEndpoint === endpoint.id ||
+                            hasMissingRequiredParams ||
+                            !normalizedSite
+                          }
+                          onClick={() => handleTestEndpoint(endpoint)}
+                        >
+                          {testingEndpoint === endpoint.id ? 'Probando...' : 'Probar respuesta'}
+                        </button>
+                        {!normalizedSite && (
+                          <small>Selecciona un sitio para habilitar la prueba.</small>
+                        )}
+                        {hasMissingRequiredParams && (
+                          <small>Completa los campos obligatorios para probar.</small>
+                        )}
+                      </div>
+                    )}
+                    {showSample && (
+                      <div
+                        className={`endpoint-card__sample endpoint-card__sample--${sampleResponse.status}`}
+                      >
+                        <header>
+                          <strong>Última respuesta</strong>
+                          <span>{sampleResponse.status === 'success' ? 'Simulada' : 'Error'}</span>
+                        </header>
+                        <pre>{sampleResponse.payload}</pre>
                       </div>
                     )}
                   </article>

@@ -48,6 +48,10 @@ const Dashboard: React.FC = () => {
             <span>🧱</span>
             Builder
           </Link>
+          <Link to="/dashboard/brokers" className="nav-item">
+            <span>📡</span>
+            Brokers MQTT
+          </Link>
           <Link to="/dashboard/settings" className="nav-item">
             <span>⚙️</span>
             Configuración

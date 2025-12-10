@@ -14,6 +14,7 @@ import (
 	"omniapi/internal/api/handlers"
 	"omniapi/internal/config"
 	"omniapi/internal/database"
+	"omniapi/internal/polling"
 	"omniapi/internal/queue/requester"
 	"omniapi/internal/queue/status"
 	"omniapi/internal/router"
@@ -225,6 +226,17 @@ func main() {
 	fmt.Println("✅ WebSocket Hub started")
 
 	// ═══════════════════════════════════════════════════════════
+	// FASE 4.5: Iniciar Polling Engine
+	// ═══════════════════════════════════════════════════════════
+	fmt.Println("\n🔄 Initializing Polling Engine...")
+	pollingEngine := polling.GetEngine()
+	if err := pollingEngine.Start(ctx); err != nil {
+		log.Printf("⚠️  Warning: could not start polling engine: %v", err)
+	} else {
+		fmt.Println("✅ Polling Engine started")
+	}
+
+	// ═══════════════════════════════════════════════════════════
 	// FASE 5: Iniciar actualización periódica de métricas
 	// ═══════════════════════════════════════════════════════════
 	fmt.Println("\n📊 Starting Prometheus metrics collector...")
@@ -259,7 +271,11 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		fmt.Println("\n� Shutting down server...")
+		fmt.Println("\n🛑 Shutting down server...")
+
+		// Detener Polling Engine
+		fmt.Println("🔄 Stopping Polling Engine...")
+		polling.GetEngine().Stop()
 
 		// Cancelar contexto para detener todos los componentes
 		cancel()
@@ -334,6 +350,33 @@ func main() {
 
 	// Configurar rutas del builder/discovery
 	http.HandleFunc("/api/discovery/runs", handlers.CORSMiddleware(handlers.DiscoveryRunsHandler))
+	http.HandleFunc("/api/discovery/run", handlers.CORSMiddleware(handlers.RunDiscoveryHandler))
+
+	// Configurar rutas de Polling Engine
+	http.HandleFunc("/api/polling/start", handlers.CORSMiddleware(handlers.StartPollingHandler))
+	http.HandleFunc("/api/polling/stop", handlers.CORSMiddleware(handlers.StopPollingHandler))
+	http.HandleFunc("/api/polling/status", handlers.CORSMiddleware(handlers.GetPollingStatusHandler))
+	http.HandleFunc("/api/polling/configs", handlers.CORSMiddleware(handlers.ListPollingConfigsHandler))
+	http.HandleFunc("/api/polling/config", handlers.CORSMiddleware(handlers.GetPollingConfigHandler))
+
+	// Configurar rutas de Broker/MQTT
+	http.HandleFunc("/api/brokers", handlers.CORSMiddleware(handlers.ListBrokersHandler))
+	http.HandleFunc("/api/brokers/add", handlers.CORSMiddleware(handlers.AddBrokerHandler))
+	http.HandleFunc("/api/brokers/test", handlers.CORSMiddleware(handlers.TestBrokerConnectionHandler))
+	http.HandleFunc("/api/brokers/templates", handlers.CORSMiddleware(handlers.GetTopicTemplatesHandler))
+	// Para rutas con ID dinámico usamos un handler que rutea según método
+	http.HandleFunc("/api/brokers/", handlers.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "PUT", "PATCH":
+			handlers.UpdateBrokerHandler(w, r)
+		case "DELETE":
+			handlers.RemoveBrokerHandler(w, r)
+		case "OPTIONS":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
 
 	// Configurar rutas WebSocket
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -381,6 +424,11 @@ func main() {
 	fmt.Printf("📖 WS Integration: http://localhost:%s/websocket\n", cfg.Port)
 	fmt.Println("───────────── Monitoring Endpoints ────────────────")
 	fmt.Printf("📈 Prometheus Metrics: http://localhost:%s/metrics\n", cfg.Port)
+	fmt.Println("───────────── Polling Engine Endpoints ────────────")
+	fmt.Printf("▶️  Start Polling: POST http://localhost:%s/api/polling/start\n", cfg.Port)
+	fmt.Printf("⏹️  Stop Polling: POST http://localhost:%s/api/polling/stop\n", cfg.Port)
+	fmt.Printf("📊 Polling Status: http://localhost:%s/api/polling/status\n", cfg.Port)
+	fmt.Printf("📋 List Configs: http://localhost:%s/api/polling/configs\n", cfg.Port)
 	fmt.Println("═══════════════════════════════════════════════════")
 
 	// Iniciar servidor

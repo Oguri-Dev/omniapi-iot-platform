@@ -39,6 +39,27 @@
   background: #e0e7ff;
 }
 
+.btn-tertiary {
+  background: #eef2ff;
+  color: #312e81;
+  border: 1px solid #c7d2fe;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.btn-tertiary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-tertiary:not(:disabled):hover {
+  background: #e0e7ff;
+}
+
 .tree-loading,
 .tree-empty {
   padding: 20px;
@@ -608,8 +629,8 @@
 
 .endpoint-builder__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
 }
 
 .endpoint-card {
@@ -626,6 +647,16 @@
   border-color: #6366f1;
   background: #ffffff;
   box-shadow: 0 12px 24px rgba(67, 56, 202, 0.12);
+}
+
+.endpoint-card--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .endpoint-card--wide {
+    grid-column: auto;
+  }
 }
 
 .endpoint-card__header {
@@ -665,6 +696,12 @@
   font-size: 0.85rem;
 }
 
+.endpoint-card__hint {
+  margin: 0;
+  color: #4338ca;
+  font-size: 0.8rem;
+}
+
 .endpoint-card__params {
   display: flex;
   flex-direction: column;
@@ -685,6 +722,51 @@
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 0.9rem;
+}
+
+.endpoint-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.endpoint-card__actions small {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.endpoint-card__sample {
+  margin-top: 8px;
+  border: 1px solid #e0e7ff;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.endpoint-card__sample header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.endpoint-card__sample pre {
+  max-height: 200px;
+  overflow: auto;
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.endpoint-card__sample--error {
+  border-color: #fecaca;
+  background: #fef2f2;
 }
 
 .endpoint-builder__sidebar {

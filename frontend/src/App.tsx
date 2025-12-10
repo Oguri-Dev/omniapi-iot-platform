@@ -6,11 +6,12 @@ import Setup from './pages/Setup'
 import Dashboard from './pages/Dashboard'
 import DashboardHome from './pages/DashboardHome'
 import Services from './pages/Services'
-import Builder from './pages/Builder'
+import PollingBuilder from './pages/PollingBuilder'
 import Connectors from './pages/Connectors'
 import Tenants from './pages/Tenants'
 import Sites from './pages/Sites'
 import ExternalServices from './pages/ExternalServices'
+import Brokers from './pages/Brokers'
 import './App.css'
 
 function App() {
@@ -34,7 +35,8 @@ function App() {
             <Route path="external-services" element={<ExternalServices />} />
             <Route path="services" element={<Services />} />
             <Route path="connectors" element={<Connectors />} />
-            <Route path="builder" element={<Builder />} />
+            <Route path="builder" element={<PollingBuilder />} />
+            <Route path="brokers" element={<Brokers />} />
             <Route path="settings" element={<div>Configuración (próximamente)</div>} />
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

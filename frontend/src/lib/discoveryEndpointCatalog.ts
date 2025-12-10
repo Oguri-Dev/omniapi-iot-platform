@@ -1,5 +1,29 @@
 import type { DiscoveryProvider } from '../services/discovery.service'
-import type { BuilderEndpointMeta } from '../types/builder'
+import type { BuilderEndpointMeta, BuilderEndpointSampleContext } from '../types/builder'
+
+const fallbackSiteId = (context: BuilderEndpointSampleContext, fallback = 'CL-REL-01') =>
+  context.site?.id || fallback
+
+const parseListParam = (value?: string, fallback: string[] = []) =>
+  value
+    ?.split(',')
+    .map((chunk) => chunk.trim())
+    .filter(Boolean) || fallback
+
+const buildTimestampSeries = (count = 6, stepMinutes = 15, baseValue = 10, amplitude = 2) => {
+  const now = Date.now()
+  return Array.from({ length: count }).map((_, index) => {
+    const timestamp = new Date(now - (count - index - 1) * stepMinutes * 60 * 1000).toISOString()
+    const value = Number((baseValue + Math.sin(index / 2) * amplitude).toFixed(2))
+    return { timestamp, value }
+  })
+}
+
+const buildChannelSeries = (channels: string[]) =>
+  channels.reduce<Record<string, { timestamp: string; value: number }[]>>((acc, channel, idx) => {
+    acc[channel] = buildTimestampSeries(6, 15, 8 + idx * 2, 1.3)
+    return acc
+  }, {})
 
 export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpointMeta[]> = {
   scaleaq: [
@@ -13,6 +37,16 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       category: 'Meta',
       targetBlock: 'assets',
       sampleResponseHint: 'Devuelve datos corporativos y lista de sitios.',
+      makeSampleResponse: () => ({
+        companyId: 'scale-demo-01',
+        name: 'ScaleAQ Benchmark Farms',
+        tenantCode: 'REL',
+        sites: [
+          { id: 'CL-REL-01', name: 'Reloncaví Norte', cages: 8 },
+          { id: 'CL-REL-08', name: 'Reloncaví Sur', cages: 6 },
+        ],
+        updatedAt: new Date().toISOString(),
+      }),
     },
     {
       id: 'scale-meta-site',
@@ -25,6 +59,24 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       targetBlock: 'assets',
       sampleResponseHint: 'Incluye jaulas, ubicación, biomass target.',
       params: [{ name: 'siteId', label: 'Site ID', required: true, placeholder: 'CL-REL-01' }],
+      makeSampleResponse: (context) => ({
+        siteId: fallbackSiteId(context),
+        name: context.site?.name || 'Centro Reloncaví',
+        location: {
+          region: 'Los Lagos',
+          lat: -41.922,
+          lon: -72.953,
+        },
+        cages: Array.from({ length: 6 }).map((_, idx) => ({
+          id: `C${idx + 1}`,
+          biomassTargetKg: 19000 + idx * 800,
+          depth: 28 + idx,
+        })),
+        health: {
+          seaLice: 1.2,
+          mortality: 0.04,
+        },
+      }),
     },
     {
       id: 'scale-ts-retrieve',
@@ -52,6 +104,15 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
           placeholder: '48h',
         },
       ],
+      makeSampleResponse: (context) => {
+        const channels = parseListParam(context.params?.channels, ['oxygen_ppm', 'feeding_rate'])
+        return {
+          siteId: fallbackSiteId(context),
+          range: context.params?.range || '48h',
+          channels,
+          data: buildChannelSeries(channels),
+        }
+      },
     },
     {
       id: 'scale-ts-data-types',
@@ -63,6 +124,14 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       category: 'Time Series',
       targetBlock: 'assets',
       sampleResponseHint: 'Retorna labels, units y frecuencias.',
+      makeSampleResponse: (context) => ({
+        siteId: fallbackSiteId(context),
+        dataTypes: [
+          { channel: 'oxygen_ppm', unit: 'ppm', frequency: '1m' },
+          { channel: 'feeding_rate', unit: 'kg/min', frequency: '10m' },
+          { channel: 'biomass_tons', unit: 'tons', frequency: '1h' },
+        ],
+      }),
     },
     {
       id: 'scale-units-aggregate',
@@ -81,6 +150,15 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
           helperText: 'Opcional. Por defecto retorna todas las unidades.',
         },
       ],
+      makeSampleResponse: (context) => ({
+        siteId: fallbackSiteId(context),
+        units: (context.params?.units || 'CL-REL-01,CL-REL-08').split(',').map((unit, index) => ({
+          unitId: unit.trim(),
+          feedingKg: 1200 + index * 150,
+          biomassKg: 18000 + index * 900,
+          oxygenMin: 7.8 - index * 0.2,
+        })),
+      }),
     },
     {
       id: 'scale-silos-aggregate',
@@ -98,6 +176,12 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
           placeholder: 'S1,S2',
         },
       ],
+      makeSampleResponse: () => ({
+        silos: [
+          { siloId: 'S1', stockKg: 8500, feedType: 'EW 3mm', lastRefill: '2025-02-07T10:00:00Z' },
+          { siloId: 'S2', stockKg: 6200, feedType: 'EW 5mm', lastRefill: '2025-02-05T14:00:00Z' },
+        ],
+      }),
     },
     {
       id: 'scale-feeding-units',
@@ -109,6 +193,14 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       category: 'Feeding',
       targetBlock: 'snapshots',
       params: [{ name: 'siteId', label: 'Site ID', required: true, placeholder: 'CL-REL-01' }],
+      makeSampleResponse: (context) => ({
+        siteId: fallbackSiteId(context),
+        updatedAt: new Date().toISOString(),
+        units: [
+          { id: 'U1', feedingKg: 320, mortality: 0.05, alerts: 0 },
+          { id: 'U2', feedingKg: 295, mortality: 0.04, alerts: 1 },
+        ],
+      }),
     },
     {
       id: 'scale-feeding-timeline',
@@ -120,6 +212,13 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       category: 'Feeding',
       targetBlock: 'timeseries',
       params: [{ name: 'siteId', label: 'Site ID', required: true, placeholder: 'CL-REL-01' }],
+      makeSampleResponse: (context) => ({
+        siteId: fallbackSiteId(context),
+        timeline: buildTimestampSeries(12, 10, 25, 4).map(({ timestamp, value }) => ({
+          timestamp,
+          feedingKg: Number((value * 12).toFixed(1)),
+        })),
+      }),
     },
     {
       id: 'scale-analytics-kpis',
@@ -131,6 +230,16 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       category: 'Analytics',
       targetBlock: 'kpis',
       params: [{ name: 'siteId', label: 'Site ID', required: true, placeholder: 'CL-REL-01' }],
+      makeSampleResponse: (context) => ({
+        siteId: fallbackSiteId(context),
+        reportDate: new Date().toISOString().slice(0, 10),
+        kpis: {
+          fcr: 1.23,
+          avgOxygen: 8.1,
+          avgTemp: 12.4,
+          biomassDelta: 2.4,
+        },
+      }),
     },
   ],
   innovex: [
@@ -143,6 +252,13 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       description: 'Lista monitores asociados al cliente con coordenadas y monitor_key.',
       category: 'Catálogo',
       targetBlock: 'assets',
+      makeSampleResponse: () => ({
+        count: 2,
+        monitors: [
+          { id: 1201, name: 'Monitor 1201', lat: -41.9, lon: -72.95, monitor_key: 'REL-AX1' },
+          { id: 1202, name: 'Monitor 1202', lat: -41.91, lon: -72.97, monitor_key: 'REL-AX2' },
+        ],
+      }),
     },
     {
       id: 'innovex-monitor-detail',
@@ -161,6 +277,16 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
           placeholder: '1234',
         },
       ],
+      makeSampleResponse: (context) => ({
+        monitorId: context.params?.monitor_id || '1234',
+        status: 'active',
+        depth: 40,
+        cages: 6,
+        sensors: [
+          { id: 'OX-1', medition: 'oxygen', depth: 5 },
+          { id: 'TMP-2', medition: 'temperature', depth: 15 },
+        ],
+      }),
     },
     {
       id: 'innovex-monitor-sensor-last-data',
@@ -181,6 +307,15 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
           helperText: 'oxygen | flow | weather | temperature',
         },
       ],
+      makeSampleResponse: (context) => ({
+        monitorId: context.params?.monitor_id || '1234',
+        medition: context.params?.medition || 'oxygen',
+        updatedAt: new Date().toISOString(),
+        sensors: [
+          { sensor_id: 'S-01', value: 8.3, unit: 'ppm' },
+          { sensor_id: 'S-02', value: 8.1, unit: 'ppm' },
+        ],
+      }),
     },
     {
       id: 'innovex-get-last-data',
@@ -195,6 +330,13 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
         { name: 'monitor_id', label: 'Monitor ID', required: true },
         { name: 'sensor_id', label: 'Sensor ID', required: true },
       ],
+      makeSampleResponse: (context) => ({
+        monitorId: context.params?.monitor_id || '1201',
+        sensorId: context.params?.sensor_id || 'S-01',
+        value: 7.95,
+        unit: 'ppm',
+        timestamp: new Date().toISOString(),
+      }),
     },
     {
       id: 'innovex-get-data-range',
@@ -214,6 +356,12 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
           required: true,
         },
       ],
+      makeSampleResponse: (context) => ({
+        monitorId: context.params?.monitor_id || '1201',
+        sensorId: context.params?.sensor_id || 'S-01',
+        range: context.params?.range || '2025-01-01/2025-01-03',
+        points: buildTimestampSeries(10, 60, 8, 0.6),
+      }),
     },
     {
       id: 'innovex-monitor-sensor-time-data',
@@ -234,6 +382,15 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
           placeholder: '1700700000-1700786400',
         },
       ],
+      makeSampleResponse: (context) => ({
+        monitorId: context.params?.monitor_id || '1201',
+        medition: context.params?.medition || 'oxygen',
+        range: context.params?.range || '1700700000-1700786400',
+        sensors: [
+          { sensor_id: 'S-01', series: buildTimestampSeries(8, 30, 8, 0.4) },
+          { sensor_id: 'S-02', series: buildTimestampSeries(8, 30, 8.4, 0.5) },
+        ],
+      }),
     },
     {
       id: 'innovex-error-table',
@@ -244,6 +401,12 @@ export const discoveryEndpointCatalog: Record<DiscoveryProvider, BuilderEndpoint
       description: 'Lista de respuestas comunes (Access Denied, Unauthorized sensor...).',
       category: 'Alertas',
       targetBlock: 'alerts',
+      makeSampleResponse: () => ({
+        errors: [
+          { code: 'AccessDenied', hint: 'Revisar API Key y monitor asignado.' },
+          { code: 'UnauthorizedSensor', hint: 'Sensor no pertenece al monitor indicado.' },
+        ],
+      }),
     },
   ],
 }

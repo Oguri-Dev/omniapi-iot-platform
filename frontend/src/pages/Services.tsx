@@ -12,9 +12,6 @@ import discoveryService, {
   type DiscoveryProvider,
   type DiscoveryCache,
 } from '../services/discovery.service'
-import EndpointBuilder, { type EndpointSelectionState } from '../components/EndpointBuilder'
-import { discoveryEndpointCatalog } from '../lib/discoveryEndpointCatalog'
-import type { BuilderViewMode } from '../types/builder'
 import '../styles/Services.css'
 
 const DISCOVERY_PROVIDERS: Array<{
@@ -55,12 +52,6 @@ const Services: React.FC = () => {
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
   const [discoveryProvider, setDiscoveryProvider] = useState<DiscoveryProvider>('scaleaq')
-  // UI toggle: permite alternar entre la vista clásica de discovery y el nuevo builder
-  const [viewMode, setViewMode] = useState<BuilderViewMode>('discovery')
-  // Estado local con los endpoints marcados + parámetros personalizados
-  const [builderSelections, setBuilderSelections] = useState<
-    Record<string, EndpointSelectionState>
-  >({})
 
   const SCALEAQ_DATA_GROUPS = useMemo(
     () => [
@@ -227,49 +218,6 @@ const Services: React.FC = () => {
     return selectedSiteNode.connectors.filter((conn) => conn.service_type === discoveryProvider)
   }, [selectedSiteNode, discoveryProvider])
 
-  const builderCatalog = useMemo(() => {
-    return discoveryEndpointCatalog[discoveryProvider] || []
-  }, [discoveryProvider])
-
-  const builderSelectedCount = useMemo(() => {
-    return Object.values(builderSelections).filter((item) => item.enabled).length
-  }, [builderSelections])
-
-  // Al hacer toggle agregamos/removemos el endpoint seleccionado en el builder
-  const handleBuilderToggle = (endpointId: string, enabled: boolean) => {
-    setBuilderSelections((prev) => {
-      if (!enabled) {
-        const { [endpointId]: _, ...rest } = prev
-        return rest
-      }
-      return {
-        ...prev,
-        [endpointId]: {
-          enabled: true,
-          params: prev[endpointId]?.params || {},
-        },
-      }
-    })
-  }
-
-  // Persistimos los parámetros escritos por el usuario para cada endpoint
-  const handleBuilderParamChange = (endpointId: string, paramName: string, value: string) => {
-    setBuilderSelections((prev) => ({
-      ...prev,
-      [endpointId]: {
-        enabled: true,
-        params: {
-          ...(prev[endpointId]?.params || {}),
-          [paramName]: value,
-        },
-      },
-    }))
-  }
-
-  const handleClearBuilder = () => {
-    setBuilderSelections({})
-  }
-
   const toggleSite = (siteKey: string) => {
     setExpandedSites((prev) => ({
       ...prev,
@@ -295,7 +243,6 @@ const Services: React.FC = () => {
   const handleSelectProvider = (provider: DiscoveryProvider) => {
     setDiscoveryProvider(provider)
     setDiscoveryError(null)
-    setBuilderSelections({})
   }
 
   const handleRunDiscovery = async (provider: DiscoveryProvider) => {
@@ -339,10 +286,6 @@ const Services: React.FC = () => {
       setDiscoveryLoading(false)
     }
   }
-
-  useEffect(() => {
-    setBuilderSelections({})
-  }, [selectedSiteId])
 
   const handleCreate = () => {
     setEditingService(null)
@@ -494,40 +437,14 @@ const Services: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <div className="discovery-view-tabs">
-                {(
-                  [
-                    { id: 'discovery', label: 'Vista discovery' },
-                    { id: 'builder', label: 'Menu builder' },
-                  ] as Array<{ id: BuilderViewMode; label: string }>
-                ).map((view) => (
-                  <button
-                    key={view.id}
-                    className={`view-tab ${viewMode === view.id ? 'is-active' : ''}`}
-                    onClick={() => setViewMode(view.id)}
-                  >
-                    {view.label}
-                  </button>
-                ))}
-              </div>
             </div>
-            {viewMode === 'discovery' ? (
-              <button
-                className="btn-primary"
-                onClick={() => handleRunDiscovery(discoveryProvider)}
-                disabled={!selectedSiteId || discoveryLoading || providerConnectors.length === 0}
-              >
-                {discoveryLoading ? 'Descubriendo...' : '▶ Ejecutar discovery'}
-              </button>
-            ) : (
-              <button
-                className="btn-secondary"
-                onClick={handleClearBuilder}
-                disabled={builderSelectedCount === 0}
-              >
-                Limpiar selección
-              </button>
-            )}
+            <button
+              className="btn-primary"
+              onClick={() => handleRunDiscovery(discoveryProvider)}
+              disabled={!selectedSiteId || discoveryLoading || providerConnectors.length === 0}
+            >
+              {discoveryLoading ? 'Descubriendo...' : '▶ Ejecutar discovery'}
+            </button>
           </div>
 
           {providerConnectors.length === 0 && selectedSiteNode && !discoveryLoading && (
@@ -537,161 +454,142 @@ const Services: React.FC = () => {
             </div>
           )}
 
-          {viewMode === 'discovery' && discoveryError && (
-            <div className="discovery-panel__error">{discoveryError}</div>
-          )}
+          {discoveryError && <div className="discovery-panel__error">{discoveryError}</div>}
 
-          {viewMode === 'discovery' ? (
-            discoveryLoading ? (
-              <div className="tree-loading">Consultando endpoints...</div>
-            ) : activeDiscovery ? (
-              <div className="discovery-output">
-                <div className="discovery-summary">
-                  <div>
-                    <p className="muted">Última ejecución</p>
-                    <strong>{new Date(activeDiscovery.generatedAt).toLocaleString()}</strong>
-                  </div>
-                  <div>
-                    <p className="muted">Proveedor</p>
-                    <strong>
-                      {activeDiscovery.provider === 'innovex' ? 'Innovex' : 'ScaleAQ'}
-                    </strong>
-                  </div>
-                  <div>
-                    <p className="muted">Ventana cubierta</p>
-                    <strong>{activeDiscovery.summary.range}</strong>
-                  </div>
-                  <div>
-                    <p className="muted">Series detectadas</p>
-                    <strong>{activeDiscovery.summary.timeseriesCount}</strong>
-                  </div>
-                  <div>
-                    <p className="muted">KPIs</p>
-                    <strong>{activeDiscovery.summary.metricsAvailable}</strong>
-                  </div>
+          {discoveryLoading ? (
+            <div className="tree-loading">Consultando endpoints...</div>
+          ) : activeDiscovery ? (
+            <div className="discovery-output">
+              <div className="discovery-summary">
+                <div>
+                  <p className="muted">Última ejecución</p>
+                  <strong>{new Date(activeDiscovery.generatedAt).toLocaleString()}</strong>
                 </div>
+                <div>
+                  <p className="muted">Proveedor</p>
+                  <strong>{activeDiscovery.provider === 'innovex' ? 'Innovex' : 'ScaleAQ'}</strong>
+                </div>
+                <div>
+                  <p className="muted">Ventana cubierta</p>
+                  <strong>{activeDiscovery.summary.range}</strong>
+                </div>
+                <div>
+                  <p className="muted">Series detectadas</p>
+                  <strong>{activeDiscovery.summary.timeseriesCount}</strong>
+                </div>
+                <div>
+                  <p className="muted">KPIs</p>
+                  <strong>{activeDiscovery.summary.metricsAvailable}</strong>
+                </div>
+              </div>
 
-                {activeDiscovery.headersUsed && (
-                  <div className="discovery-headers">
-                    {Object.entries(activeDiscovery.headersUsed).map(([header, value]) => (
-                      <span key={header}>
-                        {header}: <code>{value}</code>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="discovery-groups">
-                  {activeDiscovery.groups.map((group) => (
-                    <div key={group.id} className="discovery-group">
-                      <div className="discovery-group__header">
-                        <div>
-                          <h4>{group.title}</h4>
-                          <p>{group.description}</p>
-                        </div>
-                        <span>{group.endpoints.length} endpoints</span>
-                      </div>
-                      <div className="discovery-group__body">
-                        {group.endpoints.map((endpoint) => {
-                          const dataset = endpoint.dataset
-                          return (
-                            <div key={endpoint.path} className="discovery-endpoint">
-                              <div className="discovery-endpoint__meta">
-                                <span
-                                  className={`method-badge method-${endpoint.method.toLowerCase()}`}
-                                >
-                                  {endpoint.method}
-                                </span>
-                                <code>{endpoint.path}</code>
-                                <span
-                                  className={`availability availability-${endpoint.availability}`}
-                                >
-                                  {endpoint.availability === 'ready'
-                                    ? 'Disponible'
-                                    : endpoint.availability === 'partial'
-                                    ? 'Parcial'
-                                    : 'Error'}
-                                </span>
-                              </div>
-                              <p>{endpoint.description}</p>
-                              {dataset && (
-                                <div className="discovery-dataset">
-                                  <div className="discovery-dataset__title">{dataset.title}</div>
-                                  {dataset.summary && (
-                                    <p className="discovery-dataset__summary">{dataset.summary}</p>
-                                  )}
-                                  {dataset.metrics && (
-                                    <div className="discovery-dataset__metrics">
-                                      {dataset.metrics.map((metric) => (
-                                        <div
-                                          key={metric.label}
-                                          className={`dataset-metric ${
-                                            metric.accent ? `is-${metric.accent}` : ''
-                                          }`}
-                                        >
-                                          <span>{metric.label}</span>
-                                          <strong>{metric.value}</strong>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {dataset.highlights && (
-                                    <ul className="discovery-dataset__highlights">
-                                      {dataset.highlights.map((highlight) => (
-                                        <li key={highlight}>{highlight}</li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                  {dataset.table &&
-                                    (() => {
-                                      const table = dataset.table
-                                      return (
-                                        <div className="discovery-dataset__table">
-                                          <div className="table-header">
-                                            {table.columns.map((column) => (
-                                              <span key={column}>{column}</span>
-                                            ))}
-                                          </div>
-                                          {table.rows.map((row, index) => (
-                                            <div key={index} className="table-row">
-                                              {table.columns.map((column) => (
-                                                <span key={`${column}-${index}`}>
-                                                  {row[column] as string}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )
-                                    })()}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+              {activeDiscovery.headersUsed && (
+                <div className="discovery-headers">
+                  {Object.entries(activeDiscovery.headersUsed).map(([header, value]) => (
+                    <span key={header}>
+                      {header}: <code>{value}</code>
+                    </span>
                   ))}
                 </div>
+              )}
+
+              <div className="discovery-groups">
+                {activeDiscovery.groups.map((group) => (
+                  <div key={group.id} className="discovery-group">
+                    <div className="discovery-group__header">
+                      <div>
+                        <h4>{group.title}</h4>
+                        <p>{group.description}</p>
+                      </div>
+                      <span>{group.endpoints.length} endpoints</span>
+                    </div>
+                    <div className="discovery-group__body">
+                      {group.endpoints.map((endpoint) => {
+                        const dataset = endpoint.dataset
+                        return (
+                          <div key={endpoint.path} className="discovery-endpoint">
+                            <div className="discovery-endpoint__meta">
+                              <span
+                                className={`method-badge method-${endpoint.method.toLowerCase()}`}
+                              >
+                                {endpoint.method}
+                              </span>
+                              <code>{endpoint.path}</code>
+                              <span
+                                className={`availability availability-${endpoint.availability}`}
+                              >
+                                {endpoint.availability === 'ready'
+                                  ? 'Disponible'
+                                  : endpoint.availability === 'partial'
+                                  ? 'Parcial'
+                                  : 'Error'}
+                              </span>
+                            </div>
+                            <p>{endpoint.description}</p>
+                            {dataset && (
+                              <div className="discovery-dataset">
+                                <div className="discovery-dataset__title">{dataset.title}</div>
+                                {dataset.summary && (
+                                  <p className="discovery-dataset__summary">{dataset.summary}</p>
+                                )}
+                                {dataset.metrics && (
+                                  <div className="discovery-dataset__metrics">
+                                    {dataset.metrics.map((metric) => (
+                                      <div
+                                        key={metric.label}
+                                        className={`dataset-metric ${
+                                          metric.accent ? `is-${metric.accent}` : ''
+                                        }`}
+                                      >
+                                        <span>{metric.label}</span>
+                                        <strong>{metric.value}</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {dataset.highlights && (
+                                  <ul className="discovery-dataset__highlights">
+                                    {dataset.highlights.map((highlight) => (
+                                      <li key={highlight}>{highlight}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {dataset.table &&
+                                  (() => {
+                                    const table = dataset.table
+                                    return (
+                                      <div className="discovery-dataset__table">
+                                        <div className="table-header">
+                                          {table.columns.map((column) => (
+                                            <span key={column}>{column}</span>
+                                          ))}
+                                        </div>
+                                        {table.rows.map((row, index) => (
+                                          <div key={index} className="table-row">
+                                            {table.columns.map((column) => (
+                                              <span key={`${column}-${index}`}>
+                                                {row[column] as string}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )
+                                  })()}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="tree-empty">
-                Selecciona un centro y ejecuta el discovery para desplegar los endpoints del archivo
-                demo.
-              </div>
-            )
-          ) : selectedSiteNode ? (
-            <EndpointBuilder
-              provider={discoveryProvider}
-              site={selectedSiteNode.site}
-              endpoints={builderCatalog}
-              selections={builderSelections}
-              onToggle={handleBuilderToggle}
-              onParamChange={handleBuilderParamChange}
-            />
+            </div>
           ) : (
             <div className="tree-empty">
-              Selecciona un centro para comenzar a construir el payload de endpoints.
+              Selecciona un centro y ejecuta el discovery para desplegar los endpoints del archivo
+              demo.
             </div>
           )}
         </div>

@@ -22,6 +22,7 @@ export interface BuilderEndpointMeta {
   sampleResponseHint?: string
   defaultParams?: Record<string, string>
   params?: EndpointParamDescriptor[]
+  makeSampleResponse?: (context: BuilderEndpointSampleContext) => unknown
 }
 
 export interface BuilderEndpointSelection {
@@ -43,4 +44,15 @@ export interface BuilderPayloadPreview {
   }
   generatedAt: string
   endpoints: BuilderEndpointSelection[]
+}
+
+export interface BuilderEndpointSampleContext {
+  provider: DiscoveryProvider
+  site?: {
+    id?: string
+    code?: string
+    name?: string
+    tenantCode?: string
+  }
+  params?: Record<string, string>
 }

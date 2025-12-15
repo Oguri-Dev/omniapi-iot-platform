@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import DashboardHome from './pages/DashboardHome'
 import Services from './pages/Services'
 import PollingBuilder from './pages/PollingBuilder'
+import DataConverter from './pages/DataConverter'
 import Connectors from './pages/Connectors'
 import Tenants from './pages/Tenants'
 import Sites from './pages/Sites'
@@ -35,7 +36,8 @@ function App() {
             <Route path="external-services" element={<ExternalServices />} />
             <Route path="services" element={<Services />} />
             <Route path="connectors" element={<Connectors />} />
-            <Route path="builder" element={<PollingBuilder />} />
+            <Route path="endpoint-selection" element={<PollingBuilder />} />
+            <Route path="data-converter" element={<DataConverter />} />
             <Route path="brokers" element={<Brokers />} />
             <Route path="settings" element={<div>Configuración (próximamente)</div>} />
           </Route>

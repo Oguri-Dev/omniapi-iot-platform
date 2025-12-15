@@ -44,9 +44,13 @@ const Dashboard: React.FC = () => {
             <span>🔗</span>
             Conectores
           </Link>
-          <Link to="/dashboard/builder" className="nav-item">
-            <span>🧱</span>
-            Builder
+          <Link to="/dashboard/endpoint-selection" className="nav-item">
+            <span>📡</span>
+            Endpoint Selection
+          </Link>
+          <Link to="/dashboard/data-converter" className="nav-item">
+            <span>🔄</span>
+            Data Converter
           </Link>
           <Link to="/dashboard/brokers" className="nav-item">
             <span>📡</span>

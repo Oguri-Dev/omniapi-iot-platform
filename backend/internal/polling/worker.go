@@ -323,6 +323,9 @@ func (w *Worker) handleResult(result PollingResult) {
 	// Log a consola con formato detallado
 	w.logResult(result)
 
+	// Guardar último resultado en el engine
+	GetEngine().SaveLastResult(result)
+
 	// Publicar al broker si está configurado y habilitado
 	w.publishToBroker(result)
 

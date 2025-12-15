@@ -18,9 +18,10 @@ import (
 
 // Engine gestiona todos los workers de polling
 type Engine struct {
-	workers map[string]*Worker        // Key: configID:instanceID
-	configs map[string]*PollingConfig // Key: configID
-	mu      sync.RWMutex
+	workers     map[string]*Worker        // Key: configID:instanceID
+	configs     map[string]*PollingConfig // Key: configID
+	lastResults map[string]*PollingResult // Key: instanceID - último resultado por instancia
+	mu          sync.RWMutex
 
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -42,8 +43,9 @@ var (
 func GetEngine() *Engine {
 	engineOnce.Do(func() {
 		engineInstance = &Engine{
-			workers: make(map[string]*Worker),
-			configs: make(map[string]*PollingConfig),
+			workers:     make(map[string]*Worker),
+			configs:     make(map[string]*PollingConfig),
+			lastResults: make(map[string]*PollingResult),
 		}
 	})
 	return engineInstance
@@ -110,6 +112,25 @@ func (e *Engine) OnResult(callback func(PollingResult)) {
 // GetBrokerManager retorna el manager de brokers
 func (e *Engine) GetBrokerManager() *broker.Manager {
 	return e.brokerManager
+}
+
+// SaveLastResult guarda el último resultado de una instancia
+func (e *Engine) SaveLastResult(result PollingResult) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.lastResults[result.InstanceID] = &result
+}
+
+// GetLastResult retorna el último resultado de una instancia
+func (e *Engine) GetLastResult(instanceID string) (*PollingResult, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	result, exists := e.lastResults[instanceID]
+	if !exists {
+		return nil, fmt.Errorf("no results found for instance %s", instanceID)
+	}
+	return result, nil
 }
 
 // StartPolling inicia polling para una configuración

@@ -358,6 +358,35 @@ func main() {
 	http.HandleFunc("/api/polling/status", handlers.CORSMiddleware(handlers.GetPollingStatusHandler))
 	http.HandleFunc("/api/polling/configs", handlers.CORSMiddleware(handlers.ListPollingConfigsHandler))
 	http.HandleFunc("/api/polling/config", handlers.CORSMiddleware(handlers.GetPollingConfigHandler))
+	http.HandleFunc("/api/polling/last-result/", handlers.CORSMiddleware(handlers.GetLastResultHandler))
+
+	// Configurar rutas de Recipes (Data Converter)
+	http.HandleFunc("/api/recipes", handlers.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			handlers.ListRecipesHandler(w, r)
+		case "POST":
+			handlers.CreateRecipeHandler(w, r)
+		case "OPTIONS":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+	http.HandleFunc("/api/recipes/", handlers.CORSMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			handlers.GetRecipeHandler(w, r)
+		case "PUT", "PATCH":
+			handlers.UpdateRecipeHandler(w, r)
+		case "DELETE":
+			handlers.DeleteRecipeHandler(w, r)
+		case "OPTIONS":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
 
 	// Configurar rutas de Broker/MQTT
 	http.HandleFunc("/api/brokers", handlers.CORSMiddleware(handlers.ListBrokersHandler))

@@ -418,9 +418,7 @@ const PollingBuilderPage: React.FC = () => {
           <button
             className="btn-primary"
             onClick={handleSaveAndRestart}
-            disabled={
-              saving || !selectedSiteId || !selectedProvider || endpointInstances.length === 0
-            }
+            disabled={saving || !selectedSiteId || !selectedProvider}
           >
             {saving ? 'Guardando...' : '💾 Guardar y Reiniciar Polling'}
           </button>

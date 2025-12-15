@@ -16,10 +16,10 @@ import (
 
 // FieldMapping mapeo de un campo de origen a destino
 type FieldMapping struct {
-	From      string `bson:"from" json:"from"`                                 // Path origen (JSONPath-like)
-	To        string `bson:"to" json:"to"`                                     // Campo destino
-	Type      string `bson:"type" json:"type"`                                 // string, number, boolean, array, object
-	Transform string `bson:"transform,omitempty" json:"transform,omitempty"`   // Transformación opcional
+	From      string `bson:"from" json:"from"`                               // Path origen (JSONPath-like)
+	To        string `bson:"to" json:"to"`                                   // Campo destino
+	Type      string `bson:"type" json:"type"`                               // string, number, boolean, array, object
+	Transform string `bson:"transform,omitempty" json:"transform,omitempty"` // Transformación opcional
 }
 
 // StaticField campo con valor estático
@@ -69,14 +69,14 @@ func (s *Store) init() {
 	db := database.Database
 	if db != nil {
 		s.collection = db.Collection("recipes")
-		
+
 		// Crear índices
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		indexes := []mongo.IndexModel{
 			{
-				Keys: bson.D{{Key: "name", Value: 1}},
+				Keys:    bson.D{{Key: "name", Value: 1}},
 				Options: options.Index().SetUnique(true),
 			},
 			{
@@ -89,12 +89,12 @@ func (s *Store) init() {
 				Keys: bson.D{{Key: "instance_id", Value: 1}},
 			},
 		}
-		
+
 		_, err := s.collection.Indexes().CreateMany(ctx, indexes)
 		if err != nil {
 			fmt.Printf("⚠️  Warning: could not create recipe indexes: %v\n", err)
 		}
-		
+
 		fmt.Println("📋 Recipe Store initialized")
 	}
 }

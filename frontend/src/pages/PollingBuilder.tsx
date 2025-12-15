@@ -306,11 +306,6 @@ const PollingBuilderPage: React.FC = () => {
       return
     }
 
-    if (endpointInstances.length === 0) {
-      setStatusMessage({ type: 'error', text: 'Agrega al menos un endpoint' })
-      return
-    }
-
     setSaving(true)
     setStatusMessage(null)
 
@@ -320,6 +315,14 @@ const PollingBuilderPage: React.FC = () => {
         site_id: selectedSiteId!,
         provider: selectedProvider,
       })
+
+      // Si no hay endpoints, solo detener (eliminar configuración)
+      if (endpointInstances.length === 0) {
+        setStatusMessage({ type: 'success', text: 'Polling detenido - todos los endpoints eliminados' })
+        loadInitialData()
+        setSaving(false)
+        return
+      }
 
       // Preparar endpoints para el request
       const endpoints: EndpointInstance[] = endpointInstances.map((inst) => ({

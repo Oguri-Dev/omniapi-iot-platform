@@ -60,7 +60,7 @@ const DataConverter: React.FC = () => {
   const [outputFields, setOutputFields] = useState<FieldMapping[]>([])
   const [staticFields, setStaticFields] = useState<StaticField[]>([
     { field: 'schema', value: 'sensor-reading/v1' },
-    { field: 'timestamp', value: '$NOW' }
+    { field: 'timestamp', value: '$NOW' },
   ])
   const [recipeName, setRecipeName] = useState('')
   const [recipeDescription, setRecipeDescription] = useState('')
@@ -87,7 +87,7 @@ const DataConverter: React.FC = () => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch('http://localhost:3000/api/polling/status', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
         const data = await response.json()
@@ -102,7 +102,7 @@ const DataConverter: React.FC = () => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch('http://localhost:3000/api/recipes', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
         const data = await response.json()
@@ -118,7 +118,7 @@ const DataConverter: React.FC = () => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`http://localhost:3000/api/polling/last-result/${instanceId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
         const data = await response.json()
@@ -138,7 +138,7 @@ const DataConverter: React.FC = () => {
 
   const buildTree = (obj: unknown, parentPath: string): TreeNode[] => {
     if (obj === null || obj === undefined) return []
-    
+
     if (Array.isArray(obj)) {
       return obj.map((item, index) => {
         const path = parentPath ? `${parentPath}[${index}]` : `[${index}]`
@@ -148,12 +148,12 @@ const DataConverter: React.FC = () => {
           path,
           value: item,
           type: Array.isArray(item) ? 'array' : type,
-          children: (type === 'object' && item !== null) ? buildTree(item, path) : undefined,
-          expanded: false
+          children: type === 'object' && item !== null ? buildTree(item, path) : undefined,
+          expanded: false,
         }
       })
     }
-    
+
     if (typeof obj === 'object') {
       return Object.entries(obj).map(([key, value]) => {
         const path = parentPath ? `${parentPath}.${key}` : key
@@ -163,18 +163,18 @@ const DataConverter: React.FC = () => {
           path,
           value,
           type: Array.isArray(value) ? 'array' : type,
-          children: (type === 'object' && value !== null) ? buildTree(value, path) : undefined,
-          expanded: false
+          children: type === 'object' && value !== null ? buildTree(value, path) : undefined,
+          expanded: false,
         }
       })
     }
-    
+
     return []
   }
 
   const toggleNode = (path: string) => {
     const toggleInTree = (nodes: TreeNode[]): TreeNode[] => {
-      return nodes.map(node => {
+      return nodes.map((node) => {
         if (node.path === path) {
           return { ...node, expanded: !node.expanded }
         }
@@ -202,7 +202,7 @@ const DataConverter: React.FC = () => {
       const newMapping: FieldMapping = {
         from: draggedNode.path,
         to: draggedNode.key,
-        type: draggedNode.type as FieldMapping['type']
+        type: draggedNode.type as FieldMapping['type'],
       }
       setOutputFields([...outputFields, newMapping])
     }
@@ -235,10 +235,10 @@ const DataConverter: React.FC = () => {
 
   const getValueByPath = (obj: unknown, path: string): unknown => {
     if (!path) return obj
-    
+
     const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.')
     let current: unknown = obj
-    
+
     for (const part of parts) {
       if (current === null || current === undefined) return undefined
       if (typeof current === 'object') {
@@ -247,15 +247,15 @@ const DataConverter: React.FC = () => {
         return undefined
       }
     }
-    
+
     return current
   }
 
   const generatePreview = () => {
     if (!rawData) return
-    
+
     const output: Record<string, unknown> = {}
-    
+
     // Campos estáticos
     for (const sf of staticFields) {
       if (sf.field) {
@@ -266,7 +266,7 @@ const DataConverter: React.FC = () => {
         }
       }
     }
-    
+
     // Campos mapeados
     for (const mapping of outputFields) {
       const value = getValueByPath(rawData, mapping.from)
@@ -283,7 +283,7 @@ const DataConverter: React.FC = () => {
         current[parts[parts.length - 1]] = value
       }
     }
-    
+
     setPreviewOutput(output)
   }
 
@@ -297,7 +297,7 @@ const DataConverter: React.FC = () => {
     let provider = ''
     let endpointId = ''
     for (const status of pollingStatuses) {
-      const instance = status.instances.find(i => i.instance_id === selectedInstance)
+      const instance = status.instances.find((i) => i.instance_id === selectedInstance)
       if (instance) {
         provider = status.provider
         endpointId = instance.endpoint_id
@@ -313,7 +313,7 @@ const DataConverter: React.FC = () => {
       instance_id: selectedInstance,
       source_path: '', // Por ahora root
       field_mappings: outputFields,
-      static_fields: staticFields
+      static_fields: staticFields,
     }
 
     try {
@@ -321,10 +321,10 @@ const DataConverter: React.FC = () => {
       const response = await fetch('http://localhost:3000/api/recipes', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(recipe)
+        body: JSON.stringify(recipe),
       })
 
       if (response.ok) {
@@ -357,7 +357,7 @@ const DataConverter: React.FC = () => {
       const token = localStorage.getItem('token')
       const response = await fetch(`http://localhost:3000/api/recipes/${recipeId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (response.ok) {
@@ -372,27 +372,24 @@ const DataConverter: React.FC = () => {
     const hasChildren = node.children && node.children.length > 0
     const isExpandable = node.type === 'object' || node.type === 'array'
     const isDraggable = !isExpandable
-    
+
     return (
       <div key={node.path} className="tree-node" style={{ marginLeft: depth * 16 }}>
-        <div 
+        <div
           className={`tree-node-content ${isDraggable ? 'draggable' : ''}`}
           draggable={isDraggable}
           onDragStart={() => isDraggable && handleDragStart(node)}
         >
           {isExpandable && (
-            <span 
-              className="tree-toggle"
-              onClick={() => toggleNode(node.path)}
-            >
+            <span className="tree-toggle" onClick={() => toggleNode(node.path)}>
               {node.expanded ? '▼' : '▶'}
             </span>
           )}
           {!isExpandable && <span className="tree-toggle-placeholder">•</span>}
-          
+
           <span className="tree-key">{node.key}</span>
           <span className={`tree-type type-${node.type}`}>{node.type}</span>
-          
+
           {!isExpandable && (
             <span className="tree-value">
               {JSON.stringify(node.value).substring(0, 50)}
@@ -401,16 +398,16 @@ const DataConverter: React.FC = () => {
           )}
           {isExpandable && (
             <span className="tree-count">
-              {node.type === 'array' 
-                ? `[${(node.value as unknown[]).length}]` 
+              {node.type === 'array'
+                ? `[${(node.value as unknown[]).length}]`
                 : `{${Object.keys(node.value as object).length}}`}
             </span>
           )}
         </div>
-        
+
         {node.expanded && hasChildren && (
           <div className="tree-children">
-            {node.children!.map(child => renderTreeNode(child, depth + 1))}
+            {node.children!.map((child) => renderTreeNode(child, depth + 1))}
           </div>
         )}
       </div>
@@ -418,11 +415,11 @@ const DataConverter: React.FC = () => {
   }
 
   // Flatten all instances from all polling configs
-  const allInstances = pollingStatuses.flatMap(status => 
-    status.instances.map(instance => ({
+  const allInstances = pollingStatuses.flatMap((status) =>
+    status.instances.map((instance) => ({
       ...instance,
       provider: status.provider,
-      configId: status.config_id
+      configId: status.config_id,
     }))
   )
 
@@ -434,13 +431,13 @@ const DataConverter: React.FC = () => {
       </div>
 
       <div className="tabs">
-        <button 
+        <button
           className={`tab ${activeTab === 'builder' ? 'active' : ''}`}
           onClick={() => setActiveTab('builder')}
         >
           🛠️ Constructor
         </button>
-        <button 
+        <button
           className={`tab ${activeTab === 'recipes' ? 'active' : ''}`}
           onClick={() => setActiveTab('recipes')}
         >
@@ -453,7 +450,7 @@ const DataConverter: React.FC = () => {
           {/* Selector de endpoint */}
           <div className="endpoint-selector">
             <label>Seleccionar Endpoint Activo:</label>
-            <select 
+            <select
               value={selectedInstance}
               onChange={(e) => {
                 setSelectedInstance(e.target.value)
@@ -463,7 +460,7 @@ const DataConverter: React.FC = () => {
               }}
             >
               <option value="">-- Seleccionar --</option>
-              {allInstances.map(instance => (
+              {allInstances.map((instance) => (
                 <option key={instance.instance_id} value={instance.instance_id}>
                   [{instance.provider}] {instance.label}
                 </option>
@@ -481,12 +478,12 @@ const DataConverter: React.FC = () => {
                   <span className="hint">Arrastra campos al panel de salida</span>
                 </div>
                 <div className="panel-content tree-container">
-                  {treeData.map(node => renderTreeNode(node))}
+                  {treeData.map((node) => renderTreeNode(node))}
                 </div>
               </div>
 
               {/* Panel central: Output mapping */}
-              <div 
+              <div
                 className="panel output-panel"
                 onDragOver={handleDragOver}
                 onDrop={handleDropOnOutput}
@@ -514,10 +511,9 @@ const DataConverter: React.FC = () => {
                           onChange={(e) => updateStaticField(index, 'value', e.target.value)}
                           placeholder="valor ($NOW para timestamp)"
                         />
-                        <button 
-                          className="btn-remove"
-                          onClick={() => removeStaticField(index)}
-                        >×</button>
+                        <button className="btn-remove" onClick={() => removeStaticField(index)}>
+                          ×
+                        </button>
                       </div>
                     ))}
                     <button className="btn-add" onClick={addStaticField}>
@@ -529,9 +525,7 @@ const DataConverter: React.FC = () => {
                   <div className="fields-section">
                     <h4>Campos Mapeados</h4>
                     {outputFields.length === 0 && (
-                      <div className="drop-zone">
-                        Arrastra campos desde el panel izquierdo
-                      </div>
+                      <div className="drop-zone">Arrastra campos desde el panel izquierdo</div>
                     )}
                     {outputFields.map((mapping, index) => (
                       <div key={index} className="field-row mapped-field">
@@ -553,10 +547,9 @@ const DataConverter: React.FC = () => {
                           <option value="number">number</option>
                           <option value="boolean">boolean</option>
                         </select>
-                        <button 
-                          className="btn-remove"
-                          onClick={() => removeOutputField(index)}
-                        >×</button>
+                        <button className="btn-remove" onClick={() => removeOutputField(index)}>
+                          ×
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -573,7 +566,7 @@ const DataConverter: React.FC = () => {
                 </div>
                 <div className="panel-content">
                   <pre className="preview-json">
-                    {previewOutput 
+                    {previewOutput
                       ? JSON.stringify(previewOutput, null, 2)
                       : '// El resultado aparecerá aquí'}
                   </pre>
@@ -619,7 +612,7 @@ const DataConverter: React.FC = () => {
             </div>
           ) : (
             <div className="recipes-grid">
-              {savedRecipes.map(recipe => (
+              {savedRecipes.map((recipe) => (
                 <div key={recipe.id} className="recipe-card">
                   <div className="recipe-header">
                     <h3>{recipe.name}</h3>

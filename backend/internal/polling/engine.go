@@ -276,6 +276,15 @@ func (e *Engine) StopPolling(req StopPollingRequest) (int, error) {
 		delete(e.configs, req.ConfigID)
 	}
 
+	// Eliminar config de MongoDB si se detuvo por site_id + provider
+	if req.SiteID != "" && req.Provider != "" && req.ConfigID == "" {
+		if err := e.deleteConfigBySiteAndProvider(req.SiteID, req.Provider); err != nil {
+			fmt.Printf("⚠️  Error deleting config for %s/%s: %v\n", req.Provider, req.SiteID, err)
+		} else {
+			fmt.Printf("🗑️  Config deleted for %s/%s\n", req.Provider, req.SiteID)
+		}
+	}
+
 	return stopped, nil
 }
 
@@ -446,6 +455,35 @@ func (e *Engine) updateConfigStatus(configID string, status string) error {
 		bson.M{"$set": bson.M{"status": status, "updated_at": time.Now()}},
 	)
 	return err
+}
+
+// deleteConfigBySiteAndProvider elimina la config de MongoDB por site_id y provider
+func (e *Engine) deleteConfigBySiteAndProvider(siteID, provider string) error {
+	collection := database.GetCollection("polling_configs")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"site_id":  siteID,
+		"provider": provider,
+	}
+
+	result, err := collection.DeleteOne(ctx, filter)
+	if err != nil {
+		return err
+	}
+
+	if result.DeletedCount > 0 {
+		// También eliminar de la caché interna
+		for configID, config := range e.configs {
+			if config.SiteID == siteID && config.Provider == provider {
+				delete(e.configs, configID)
+				break
+			}
+		}
+	}
+
+	return nil
 }
 
 // cleanupDuplicateConfigs elimina configs duplicadas manteniendo solo la más reciente

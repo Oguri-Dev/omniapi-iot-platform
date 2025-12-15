@@ -18,6 +18,22 @@ interface PollingStatus {
   instances: PollingInstance[]
 }
 
+interface PollingConfig {
+  id: string
+  provider: string
+  site_id: string
+  tenant_id: string
+  status: string
+  endpoints: EndpointConfig[]
+}
+
+interface EndpointConfig {
+  instance_id: string
+  endpoint_id: string
+  label: string
+  enabled: boolean
+}
+
 interface Recipe {
   id: string
   name: string
@@ -86,12 +102,27 @@ const DataConverter: React.FC = () => {
   const loadPollingStatuses = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:3000/api/polling/status', {
+      const response = await fetch('http://localhost:3000/api/polling/configs', {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
         const data = await response.json()
-        setPollingStatuses(data.configs || [])
+        // Transform configs to the format we need (with instances)
+        const configs = (data.data || []).map((config: PollingConfig) => ({
+          config_id: config.id,
+          provider: config.provider,
+          site_id: config.site_id,
+          tenant_id: config.tenant_id,
+          status: config.status,
+          instances: config.endpoints.map((ep: EndpointConfig) => ({
+            instance_id: ep.instance_id,
+            endpoint_id: ep.endpoint_id,
+            label: ep.label,
+            provider: config.provider,
+            status: ep.enabled ? 'active' : 'stopped',
+          })),
+        }))
+        setPollingStatuses(configs)
       }
     } catch (error) {
       console.error('Error loading polling statuses:', error)
